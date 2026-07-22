@@ -95,6 +95,15 @@ rewrites `/api/*` to it, and Python dependencies come from `pyproject.toml` +
 > Python `/api` serverless function, and the LLM fallback all work in production.
 > Pushes to `main` auto-deploy via the Vercel–GitHub integration.
 
+## Credits
+
+- **A. Odrzywołek**, _All elementary functions from a single operator_,
+  arXiv:2603.21852 (2026) — the single-operator result this is built on.
+- The integer (binary double-and-add) construction and the inverse-function
+  log-forms are adopted from the author's reference implementation,
+  [VA00/SymbolicRegressionPackage](https://github.com/VA00/SymbolicRegressionPackage)
+  (MIT). Every construction is independently re-checked here by the numeric verifier.
+
 ## License
 
 MIT

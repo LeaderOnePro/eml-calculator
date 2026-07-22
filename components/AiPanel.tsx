@@ -17,7 +17,7 @@ type CompileResult = {
   stage?: string;
 };
 
-const EXAMPLES = ["ln(2)", "e^x", "2*3", "x^2", "sqrt(2)", "pi", "i", "e^(i*pi)"];
+const EXAMPLES = ["sin(x)", "cos(x)", "tan(x)", "e^(i*pi)", "sqrt(2)", "ln(2)", "atan(x)", "pi"];
 
 function fmtValue(v: { re: number; im: number }): string {
   const snap = (x: number) =>

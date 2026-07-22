@@ -73,6 +73,9 @@ export default function Calculator({ play }: { play?: PlayRequest }) {
     if (playTimer.current) clearInterval(playTimer.current);
     const s = play.rpn.trim();
     const tokens = /\s/.test(s) ? s.split(/\s+/) : [...s];
+    // Adaptive speed: short programs animate slowly (~220ms/press); large ones
+    // (a trig function can be hundreds of presses) finish within ~5s total.
+    const interval = Math.max(8, Math.min(220, Math.round(5000 / tokens.length)));
     setPast([]);
     setStack([]);
     const built: EmlNode[] = [];
@@ -90,7 +93,7 @@ export default function Calculator({ play }: { play?: PlayRequest }) {
       } else if (tok === "1") built.push(one());
       else built.push(evar(tok));
       setStack([...built]);
-    }, 220);
+    }, interval);
     return () => {
       if (playTimer.current) clearInterval(playTimer.current);
     };
