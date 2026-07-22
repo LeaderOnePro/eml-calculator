@@ -83,9 +83,15 @@ export LONGCAT_API_KEY=...      # or copy .env.example → .env.local
 
 ## Deploy
 
-Vercel builds the Next.js frontend and the `api/*.py` Python functions from one
-project; Python dependencies come from `pyproject.toml` + `uv.lock`. Set
-`LONGCAT_API_KEY` in the project's environment variables.
+One Vercel project serves both the Next.js frontend and the Python API. The
+FastAPI app in `api/index.py` becomes a single serverless function; `vercel.json`
+rewrites `/api/*` to it, and Python dependencies come from `pyproject.toml` +
+`uv.lock`. Set `LONGCAT_API_KEY` in the project's environment variables.
+
+> The local dev setup (Next dev + uvicorn + `/api` proxy) is fully working and
+> verified end-to-end. The exact Next.js + Python routing on Vercel should be
+> confirmed on the first deploy — Vercel's `/api/*.py` convention vs. the newer
+> Services feature.
 
 ## License
 
