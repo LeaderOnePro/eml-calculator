@@ -74,15 +74,106 @@ I: Node = POW(NEG(ONE), HALF)  # +i
 PI: Node = MUL(NEG(I), LN(NEG(ONE)))  # (-i)·(+iπ) = π
 
 
+# --- transcendental function builders ---
+# Euler forms for trig/hyperbolic and log-forms for the inverse functions, adopted
+# from VA00/SymbolicRegressionPackage's EmL_compiler (MIT). Every form's correctness
+# is enforced downstream by the numeric verifier (verify.py).
+def DOUBLE(z: Node) -> Node:
+    return ADD(z, z)
+
+
+def SQRT(z: Node) -> Node:
+    return POW(z, HALF)
+
+
+def SIN(x: Node) -> Node:  # (e^{ix} − e^{−ix}) / (2i)
+    ix = MUL(I, x)
+    return DIV(SUB(EXP(ix), EXP(NEG(ix))), MUL(TWO, I))
+
+
+def COS(x: Node) -> Node:  # (e^{ix} + e^{−ix}) / 2
+    ix = MUL(I, x)
+    return DIV(ADD(EXP(ix), EXP(NEG(ix))), TWO)
+
+
+def TAN(x: Node) -> Node:
+    return DIV(SIN(x), COS(x))
+
+
+def SINH(z: Node) -> Node:  # (e^{2z} − 1) / (2 e^z)
+    return DIV(SUB(EXP(DOUBLE(z)), ONE), MUL(TWO, EXP(z)))
+
+
+def COSH(z: Node) -> Node:  # (e^{2z} + 1) / (2 e^z)
+    return DIV(ADD(EXP(DOUBLE(z)), ONE), MUL(TWO, EXP(z)))
+
+
+def TANH(z: Node) -> Node:  # (e^{2z} − 1) / (e^{2z} + 1)
+    e2z = EXP(DOUBLE(z))
+    return DIV(SUB(e2z, ONE), ADD(e2z, ONE))
+
+
+def ASIN(z: Node) -> Node:  # i·ln(−i·z + √(1 − z²))
+    return MUL(I, LN(ADD(NEG(MUL(I, z)), SQRT(SUB(ONE, MUL(z, z))))))
+
+
+def ACOS(z: Node) -> Node:  # −i·ln(z + √(z−1)·√(z+1))  (sign fixed for the EML branch)
+    return MUL(NEG(I), LN(ADD(z, MUL(SQRT(SUB(z, ONE)), SQRT(ADD(z, ONE))))))
+
+
+def ATAN(z: Node) -> Node:  # (−i/2)·ln((−i + z)/(−i − z))
+    return MUL(DIV(NEG(I), TWO), LN(DIV(ADD(NEG(I), z), SUB(NEG(I), z))))
+
+
+def ASINH(z: Node) -> Node:  # ln(z + √(z² + 1))
+    return LN(ADD(z, SQRT(ADD(MUL(z, z), ONE))))
+
+
+def ACOSH(z: Node) -> Node:  # ln(z + √(z+1)·√(z−1))
+    return LN(ADD(z, MUL(SQRT(ADD(z, ONE)), SQRT(SUB(z, ONE)))))
+
+
+def ATANH(z: Node) -> Node:  # (1/2)·ln((1 + z)/(1 − z))
+    return MUL(HALF, LN(DIV(ADD(ONE, z), SUB(ONE, z))))
+
+
+_FUNCS = {
+    "exp": EXP,
+    "ln": LN,
+    "log": LN,
+    "sqrt": SQRT,
+    "sin": SIN,
+    "cos": COS,
+    "tan": TAN,
+    "asin": ASIN,
+    "acos": ACOS,
+    "atan": ATAN,
+    "sinh": SINH,
+    "cosh": COSH,
+    "tanh": TANH,
+    "asinh": ASINH,
+    "acosh": ACOSH,
+    "atanh": ATANH,
+}
+
+
 def _integer(n: int) -> Node:
     if n == 0:
         return ZERO
     if n < 0:
         return NEG(_integer(-n))
-    node: Node = ONE
-    for _ in range(n - 1):
-        node = ADD(node, ONE)
-    return node
+    # binary double-and-add (adopted from VA00/SymbolicRegressionPackage eml_int):
+    # O(log n) additions instead of O(n), so integers/constants get much shorter K.
+    acc: Node | None = None
+    term: Node = ONE
+    k = n
+    while k > 0:
+        if k & 1:
+            acc = term if acc is None else ADD(acc, term)
+        term = ADD(term, term)
+        k >>= 1
+    assert acc is not None
+    return acc
 
 
 def _rational(value: float) -> Node:
@@ -121,12 +212,8 @@ def lower(ast: A.Ast) -> Node:
     if isinstance(ast, A.Pow):
         return POW(L(ast.a), L(ast.b))
     if isinstance(ast, A.Func):
-        x = L(ast.x)
-        if ast.name == "exp":
-            return EXP(x)
-        if ast.name in ("ln", "log"):
-            return LN(x)
-        if ast.name == "sqrt":
-            return POW(x, HALF)
-        raise ValueError(f"unsupported function '{ast.name}'")
+        fn = _FUNCS.get(ast.name)
+        if fn is None:
+            raise ValueError(f"unsupported function '{ast.name}'")
+        return fn(L(ast.x))
     raise ValueError(f"cannot lower AST node {ast!r}")

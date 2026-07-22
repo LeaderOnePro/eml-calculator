@@ -37,7 +37,7 @@ for f in ["2*3", "1/2", "sqrt(2)", "i", "pi", "-1", "2+3", "6/2"]:
     add(compile_ast(parse_formula(f))["rpn"])
 
 # compiled functions, sampled at several x
-for f in ["x^2", "e^x", "ln(x)", "2*x", "1/x"]:
+for f in ["x^2", "e^x", "ln(x)", "2*x", "1/x", "sin(x)", "cos(x)", "atan(x)"]:
     rpn = compile_ast(parse_formula(f))["rpn"]
     for x in [0.5, 1.7, 3.2]:
         add(rpn, x)

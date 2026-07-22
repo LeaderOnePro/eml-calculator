@@ -114,3 +114,27 @@ def test_paper_k_values():
     assert compile_ast(A.Func("exp", A.VarX()))["k"] == 3  # e^x -> x1E
     assert compile_ast(A.Func("ln", A.VarX()))["k"] == 7  # lnx -> 11xE1EE
     assert compile_ast(A.Num(0))["k"] == 7  # 0   -> 111E1EE
+
+
+TRANSCENDENTAL = [
+    "sin", "cos", "tan",
+    "asin", "acos", "atan",
+    "sinh", "cosh", "tanh",
+    "asinh", "acosh", "atanh",
+]
+
+
+@pytest.mark.parametrize("fn", TRANSCENDENTAL)
+def test_transcendental_compiles_and_verifies(fn):
+    from emlcore.parser import parse_formula
+
+    r = compile_ast(parse_formula(f"{fn}(x)"))
+    assert r["verified"], f"{fn}(x) failed verify (max_err={r['max_err']})"
+    assert r["variables"] == ["x"]
+
+
+def test_function_aliases():
+    from emlcore.parser import parse_formula
+
+    for a, b in [("arcsin(x)", "asin(x)"), ("arctan(x)", "atan(x)"), ("arcosh(x)", "acosh(x)")]:
+        assert compile_ast(parse_formula(a))["rpn"] == compile_ast(parse_formula(b))["rpn"]

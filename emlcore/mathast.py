@@ -103,6 +103,15 @@ def _collect(ast: Ast, out: set[str]) -> None:
         _collect(ast.b, out)
 
 
+_CMATH_FUNCS = {
+    "exp": cmath.exp, "ln": cmath.log, "log": cmath.log, "sqrt": cmath.sqrt,
+    "sin": cmath.sin, "cos": cmath.cos, "tan": cmath.tan,
+    "asin": cmath.asin, "acos": cmath.acos, "atan": cmath.atan,
+    "sinh": cmath.sinh, "cosh": cmath.cosh, "tanh": cmath.tanh,
+    "asinh": cmath.asinh, "acosh": cmath.acosh, "atanh": cmath.atanh,
+}
+
+
 def ref_eval(ast: Ast, env: dict[str, complex] | None = None) -> complex:
     env = env or {}
     e = ref_eval
@@ -132,11 +141,8 @@ def ref_eval(ast: Ast, env: dict[str, complex] | None = None) -> complex:
         return e(ast.a, env) ** e(ast.b, env)
     if isinstance(ast, Func):
         v = e(ast.x, env)
-        if ast.name == "exp":
-            return cmath.exp(v)
-        if ast.name in ("ln", "log"):
-            return cmath.log(v)
-        if ast.name == "sqrt":
-            return cmath.sqrt(v)
-        raise ValueError(f"unknown function '{ast.name}'")
+        f = _CMATH_FUNCS.get(ast.name)
+        if f is None:
+            raise ValueError(f"unknown function '{ast.name}'")
+        return f(v)
     raise ValueError(f"cannot evaluate AST node {ast!r}")

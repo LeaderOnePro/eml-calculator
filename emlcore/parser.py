@@ -41,7 +41,22 @@ _GRAMMAR = r"""
     %ignore WS
 """
 
-_SUPPORTED_FUNCS = {"exp", "ln", "log", "sqrt"}
+_SUPPORTED_FUNCS = {
+    "exp", "ln", "sqrt",
+    "sin", "cos", "tan",
+    "asin", "acos", "atan",
+    "sinh", "cosh", "tanh",
+    "asinh", "acosh", "atanh",
+}
+
+# normalize common spellings to the canonical names above
+_ALIASES = {
+    "log": "ln",
+    "arcsin": "asin", "arccos": "acos", "arctan": "atan",
+    "arsinh": "asinh", "arcsinh": "asinh",
+    "arcosh": "acosh", "arccosh": "acosh",
+    "artanh": "atanh", "arctanh": "atanh",
+}
 
 
 @v_args(inline=True)
@@ -83,10 +98,10 @@ class _BuildAst(Transformer):
         raise ValueError(f"unknown symbol '{tok}'")
 
     def func(self, name, arg):
-        f = str(name).lower()
+        f = _ALIASES.get(str(name).lower(), str(name).lower())
         if f not in _SUPPORTED_FUNCS:
             raise ValueError(f"unsupported function '{name}'")
-        return A.Func("ln" if f == "log" else f, arg)
+        return A.Func(f, arg)
 
 
 _parser = Lark(_GRAMMAR, parser="lalr", transformer=_BuildAst())

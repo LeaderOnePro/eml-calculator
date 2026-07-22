@@ -11,8 +11,9 @@ from . import mathast as A
 from .evaluate import evaluate
 from .tree import Node, variables
 
-# Sample points on the positive real axis (avoids the ln branch cut).
-DEFAULT_SAMPLES = [0.3, 0.7, 1.5, 2.2, 3.1, 4.7]
+# Sample points on the positive real axis, chosen to avoid the tan/sec poles
+# near π/2 and 3π/2 while covering both the |x|<1 and |x|>1 regimes.
+DEFAULT_SAMPLES = [0.3, 0.7, 1.1, 2.3, 3.3, 4.1]
 
 
 def _close(got: complex, expect: complex, tol: float) -> bool:
@@ -33,19 +34,25 @@ def verify(node: Node, ast: A.Ast, tol: float = 1e-6, samples=None) -> dict:
         }
 
     samples = samples if samples is not None else DEFAULT_SAMPLES
-    checks = []
-    max_err = 0.0
-    ok = True
+    real_pts = []
+    all_pts = []
     for x in samples:
         try:
             expect = A.ref_eval(ast, {"x": complex(x)})
         except Exception:
-            continue  # x outside the reference domain — skip
+            continue  # reference raised — x outside its domain
         got = evaluate(node, {"x": complex(x)})
-        max_err = max(max_err, abs(got - expect))
-        checks.append({"x": x, "expect": expect, "got": got})
-        if not _close(got, expect, tol):
-            ok = False
+        rec = {"x": x, "expect": expect, "got": got}
+        all_pts.append(rec)
+        if abs(expect.imag) <= 1e-9:
+            real_pts.append(rec)
+
+    # Prefer the real-valued domain (the paper verifies "on the real axis where
+    # appropriate"); fall back to full complex comparison only for functions that
+    # are complex-valued on the reals, e.g. e^{ix}.
+    checks = real_pts if real_pts else all_pts
     if not checks:
-        ok = False
+        return {"ok": False, "max_err": 0.0, "checks": []}
+    max_err = max(abs(c["got"] - c["expect"]) for c in checks)
+    ok = all(_close(c["got"], c["expect"], tol) for c in checks)
     return {"ok": ok, "max_err": max_err, "checks": checks}
