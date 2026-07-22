@@ -29,29 +29,50 @@ class CompileRequest(BaseModel):
 
 @app.post("/api/compile")
 def compile_endpoint(req: CompileRequest) -> dict:
-    """Compile a formula string to a verified EML/RPN program.
+    """Compile a formula to a verified EML/RPN program.
 
-    Deterministic path: parse -> lower -> numeric verify. If the parser can't
-    handle the input (natural language / messy), the LLM fallback takes over
-    (wired in a later step); today that surfaces as a parse error.
+    Path: deterministic parse -> (LLM fallback if parse fails) -> lower -> verify.
+    The LLM only rewrites messy/natural-language input into a supported formula
+    string, which is then parsed deterministically and numerically verified.
     """
     formula = (req.formula or "").strip()
     if not formula:
         return {"ok": False, "stage": "parse", "error": "empty formula", "input": formula}
 
+    source = "parser"
+    interpreted = formula
     try:
         ast = parse_formula(formula)
-        source = "parser"
     except Exception as parse_err:
-        # TODO(llm): fall back to LongCat-2.0 to turn `formula` into an AST here.
-        return {"ok": False, "stage": "parse", "error": str(parse_err), "input": formula}
+        # Fallback: ask LongCat-2.0 to translate, then re-parse deterministically.
+        try:
+            from emlcore.llm import formula_from_nl
+
+            interpreted = formula_from_nl(formula)
+            ast = parse_formula(interpreted)
+            source = "llm"
+        except Exception as llm_err:
+            return {
+                "ok": False,
+                "stage": "parse",
+                "input": formula,
+                "error": str(parse_err),
+                "llm_error": str(llm_err),
+            }
 
     try:
         result = compile_ast(ast)
     except Exception as lower_err:
-        return {"ok": False, "stage": "lower", "error": str(lower_err), "input": formula}
+        return {
+            "ok": False,
+            "stage": "lower",
+            "input": formula,
+            "interpreted": interpreted,
+            "error": str(lower_err),
+        }
 
     result["input"] = formula
+    result["interpreted"] = interpreted
     result["source"] = source
     result["ok"] = bool(result["verified"])
     if not result["verified"]:

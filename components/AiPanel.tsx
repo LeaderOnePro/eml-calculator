@@ -5,6 +5,7 @@ import { useState } from "react";
 type CompileResult = {
   ok: boolean;
   input?: string;
+  interpreted?: string;
   rpn?: string;
   k?: number;
   depth?: number;
@@ -107,6 +108,11 @@ export default function AiPanel({ onCompiled }: { onCompiled: (rpn: string) => v
                   K={res.k} · depth={res.depth}
                 </span>
               </div>
+              {res.source === "llm" && res.interpreted && (
+                <div className="mt-1 text-xs text-zinc-500">
+                  read as <span className="font-mono text-zinc-300">{res.interpreted}</span>
+                </div>
+              )}
               {res.value && (
                 <div className="mt-2 font-mono text-2xl text-emerald-300">{fmtValue(res.value)}</div>
               )}
