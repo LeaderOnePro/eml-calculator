@@ -90,10 +90,10 @@ FastAPI app in `api/index.py` becomes a single serverless function; `vercel.json
 rewrites `/api/*` to it, and Python dependencies come from `pyproject.toml` +
 `uv.lock`. Set `LONGCAT_API_KEY` in the project's environment variables.
 
-> The local dev setup (Next dev + uvicorn + `/api` proxy) is fully working and
-> verified end-to-end. The exact Next.js + Python routing on Vercel should be
-> confirmed on the first deploy — Vercel's `/api/*.py` convention vs. the newer
-> Services feature.
+> Deployed and verified end-to-end at
+> [eml-calculator.vercel.app](https://eml-calculator.vercel.app): the frontend, the
+> Python `/api` serverless function, and the LLM fallback all work in production.
+> Pushes to `main` auto-deploy via the Vercel–GitHub integration.
 
 ## License
 
