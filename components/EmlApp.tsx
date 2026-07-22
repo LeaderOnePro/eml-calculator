@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { one, evar, eml, rpnString, parseRpn, type EmlNode } from "@/lib/eml";
 import Calculator, { type PlayRequest } from "./Calculator";
+import AiPanel from "./AiPanel";
 
 // Build demo programs from the paper's identities so their RPN is correct
 // by construction (no hand-copied token strings).
@@ -44,6 +45,8 @@ export default function EmlApp() {
       <Calculator play={play} />
 
       <div className="flex flex-col gap-4">
+        <AiPanel onCompiled={fire} />
+
         <section className="rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
           <h2 className="text-sm font-medium text-zinc-300">One-click demos</h2>
           <p className="mt-1 text-xs text-zinc-500">
@@ -82,19 +85,12 @@ export default function EmlApp() {
             />
             <button
               onClick={runManual}
-              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500"
+              className="rounded-lg bg-zinc-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-600"
             >
               run
             </button>
           </div>
           {err && <p className="mt-2 text-xs text-red-400">{err}</p>}
-        </section>
-
-        <section className="rounded-2xl border border-dashed border-zinc-800 bg-zinc-950/50 p-5">
-          <h2 className="text-sm font-medium text-zinc-400">AI: formula → EML</h2>
-          <p className="mt-1 text-xs text-zinc-600">
-            Coming next — type any formula and it compiles to a verified button sequence.
-          </p>
         </section>
       </div>
     </div>
