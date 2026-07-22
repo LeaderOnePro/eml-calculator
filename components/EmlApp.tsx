@@ -41,10 +41,10 @@ export default function EmlApp() {
   };
 
   return (
-    <div className="grid w-full max-w-4xl gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+    <div className="grid w-full max-w-4xl grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <Calculator play={play} />
 
-      <div className="flex flex-col gap-4">
+      <div className="flex min-w-0 flex-col gap-4">
         <AiPanel onCompiled={fire} />
 
         <section className="rounded-2xl border border-zinc-800 bg-zinc-950 p-5">

@@ -110,7 +110,7 @@ export default function Calculator({ play }: { play?: PlayRequest }) {
   }, [top]);
 
   return (
-    <div className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-950 p-5 shadow-2xl">
+    <div className="w-full min-w-0 max-w-md rounded-2xl border border-zinc-800 bg-zinc-950 p-5 shadow-2xl">
       {/* value display */}
       <div className="rounded-xl bg-black/60 px-5 py-6 ring-1 ring-inset ring-zinc-800">
         <div className="flex items-baseline justify-between">
@@ -124,7 +124,7 @@ export default function Calculator({ play }: { play?: PlayRequest }) {
         <div
           className={`mt-1 truncate font-mono ${
             display.isFunc ? "text-sky-300" : "text-emerald-300"
-          } ${display.value.length > 14 ? "text-3xl" : "text-5xl"}`}
+          } ${display.value.length > 14 ? "text-2xl sm:text-3xl" : "text-3xl sm:text-5xl"}`}
           title={display.value}
         >
           {display.value}
