@@ -1,36 +1,92 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# EML Calculator
 
-## Getting Started
+A scientific calculator with **exactly two buttons** — `1` and `eml` — plus an AI
+assistant that compiles any formula into a verified sequence of button presses.
 
-First, run the development server:
+It's built on a striking result: the single binary operator
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+eml(x, y) = exp(x) − ln(y)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+together with the constant `1`, generates the entire scientific‑calculator
+repertoire. Every elementary function becomes a binary tree of this one operator
+(grammar `S → 1 | eml(S, S)`).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+> Based on **A. Odrzywołek, _All elementary functions from a single operator_**,
+> arXiv:2603.21852 (2026).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+For example:
 
-## Learn More
+| function | EML | RPN |
+| --- | --- | --- |
+| `e`   | `eml(1, 1)` | `11E` |
+| `eˣ`  | `eml(x, 1)` | `x1E` |
+| `ln x`| `eml(1, eml(eml(1, x), 1))` | `11xE1EE` |
 
-To learn more about Next.js, take a look at the following resources:
+## How it works
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **Two‑button calculator** — an RPN stack machine. `1` pushes a terminal; `eml`
+  pops two operands `a, b` and pushes `eml(a, b)`. The running value is evaluated
+  live over ℂ on the principal branch (with the extended‑real edges the paper
+  needs: `ln 0 = −∞`, `e^{−∞} = 0`).
+- **AI: formula → EML** — a deterministic grammar parser handles well‑formed input
+  (`sin(x)+2`, `sqrt(2)`, `e^(i*pi)`); only genuinely messy / natural‑language
+  input falls back to an LLM (**LongCat‑2.0**). Either way the result is lowered by
+  the same deterministic compiler and **numerically verified** against a reference
+  evaluator before it's shown — the compiler never returns an unverified program.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Architecture
 
-## Deploy on Vercel
+```
+Client — Next.js / React / TS          Server — Python (FastAPI, uv)
+  lib/eml/     interactive EML core       emlcore/   authoritative EML core
+  components/  two-button calculator         tree · evaluate (numpy) · mathast
+  app/         page                          lower · verify · compile
+                                           api/index.py   /api endpoints
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The client evaluator (`lib/eml`) and the server evaluator (`emlcore`) mirror each
+other bit‑for‑bit on the same programs; a cross‑check keeps them honest.
+Deployed as a single Vercel project (Next.js frontend + Python serverless `/api`).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Development
+
+Prerequisites: `pnpm`, and [`uv`](https://docs.astral.sh/uv/) for Python.
+
+```bash
+pnpm install            # frontend deps
+uv sync                 # backend deps (Python 3.12 venv + lockfile)
+
+# run both (two terminals):
+uv run uvicorn api.index:app --port 8000 --reload   # backend
+pnpm dev                                            # frontend → http://localhost:3000
+```
+
+In dev, Next.js proxies `/api/*` to the local backend (see `next.config.ts`), so
+the browser makes same‑origin requests.
+
+### Testing
+
+```bash
+pnpm test                 # TS core (vitest)
+uv run pytest             # Python core (golden tests)
+```
+
+### Configuration
+
+The LLM fallback needs a LongCat key, server‑side only:
+
+```bash
+export LONGCAT_API_KEY=...      # or copy .env.example → .env.local
+```
+
+## Deploy
+
+Vercel builds the Next.js frontend and the `api/*.py` Python functions from one
+project; Python dependencies come from `pyproject.toml` + `uv.lock`. Set
+`LONGCAT_API_KEY` in the project's environment variables.
+
+## License
+
+MIT
