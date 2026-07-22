@@ -3,6 +3,8 @@
 A scientific calculator with **exactly two buttons** — `1` and `eml` — plus an AI
 assistant that compiles any formula into a verified sequence of button presses.
 
+**▶ Live demo — [eml-calculator.vercel.app](https://eml-calculator.vercel.app)**
+
 It's built on a striking result: the single binary operator
 
 ```
