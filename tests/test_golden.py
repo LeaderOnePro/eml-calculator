@@ -129,9 +129,19 @@ def test_function_aliases():
 def test_llm_prompt_covers_supported_functions():
     """The NL fallback prompt must advertise every function the parser can
     lower; otherwise the model refuses expressible requests. Add a function to
-    parser._SUPPORTED_FUNCS without updating the prompt and this test fails."""
+    parser._SUPPORTED_FUNCS without updating the prompt and this test fails.
+
+    The check targets only the '- functions:' bullet block and requires a
+    word-boundary 'name(' token: a plain substring test would still pass if
+    e.g. 'sin' were dropped from the list because 'sin' occurs inside
+    'asin(' / 'sinh('."""
+    import re
+
     from emlcore.llm import _SYSTEM
     from emlcore.parser import _SUPPORTED_FUNCS
 
+    m = re.search(r"- functions:(.*?)(?=\n- )", _SYSTEM, re.DOTALL)
+    assert m, "LLM prompt is missing its '- functions:' bullet"
     for fn in _SUPPORTED_FUNCS:
-        assert fn in _SYSTEM, f"LLM prompt missing supported function '{fn}'"
+        assert re.search(rf"\b{fn}\(", m.group(1)), (
+            f"LLM prompt function list missing '{fn}'")
