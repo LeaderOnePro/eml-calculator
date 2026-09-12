@@ -3,6 +3,10 @@
 The model's ONLY job is translation to a formula string; that string is then
 re-parsed by the deterministic parser and numerically verified, so the LLM can
 never bypass correctness checks. Uses LongCat-2.0 via the OpenAI-compatible API.
+
+The grammar advertised in _SYSTEM must cover every function in
+parser._SUPPORTED_FUNCS — the drift guard is
+tests/test_golden.py::test_llm_prompt_covers_supported_functions.
 """
 
 from __future__ import annotations
@@ -12,11 +16,19 @@ import os
 _MODEL = "LongCat-2.0"
 _BASE_URL = "https://api.longcat.chat/openai"
 
+# Grammar block. The function list below mirrors parser._SUPPORTED_FUNCS
+# (the parser also accepts aliases such as log / arcsin, but the canonical
+# names are what the model should emit). Keep both in sync — enforced by the
+# golden test above.
 _SYSTEM = """You convert a user's mathematical request into ONE formula string.
 
 Use ONLY this grammar:
 - numbers, and the operators + - * / ^ (^ is power), parentheses, unary minus
-- functions: exp(...), ln(...), sqrt(...)
+- functions: exp(...), ln(...), sqrt(...),
+            sin(...), cos(...), tan(...),
+            asin(...), acos(...), atan(...),
+            sinh(...), cosh(...), tanh(...),
+            asinh(...), acosh(...), atanh(...)
 - constants: e, pi, i (imaginary unit)
 - the single variable: x
 
@@ -33,8 +45,10 @@ e to the i pi                     -> e^(i*pi)
 natural log of x plus one         -> ln(x)+1
 two thirds                        -> 2/3
 x squared minus 1                 -> x^2-1
+the sine of x                     -> sin(x)
+inverse tangent of x              -> atan(x)
+hyperbolic cosine of 1           -> cosh(1)
 """
-
 
 def formula_from_nl(text: str, timeout: float = 20.0) -> str:
     """Translate free-form text to a supported formula string. Raises on failure."""
