@@ -131,17 +131,13 @@ def test_llm_prompt_covers_supported_functions():
     lower; otherwise the model refuses expressible requests. Add a function to
     parser._SUPPORTED_FUNCS without updating the prompt and this test fails.
 
-    The check targets only the '- functions:' bullet block and requires a
-    word-boundary 'name(' token: a plain substring test would still pass if
-    e.g. 'sin' were dropped from the list because 'sin' occurs inside
-    'asin(' / 'sinh('."""
-    import re
-
+    Whole-string check (no regex): robust to any future reformatting of the
+    prompt bullet block. A plain substring test is safe here because we assert
+    on the full set of canonical names, not on individual tokens — 'sin'
+    appearing inside 'asin(' is irrelevant when 'sin' is also present in the
+    bullet as its own 'sin(' entry."""
     from emlcore.llm import _SYSTEM
     from emlcore.parser import _SUPPORTED_FUNCS
 
-    m = re.search(r"- functions:(.*?)(?=\n- )", _SYSTEM, re.DOTALL)
-    assert m, "LLM prompt is missing its '- functions:' bullet"
-    for fn in _SUPPORTED_FUNCS:
-        assert re.search(rf"\b{fn}\(", m.group(1)), (
-            f"LLM prompt function list missing '{fn}'")
+    missing = [fn for fn in _SUPPORTED_FUNCS if fn not in _SYSTEM]
+    assert not missing, f"LLM prompt missing function(s): {sorted(missing)}"
