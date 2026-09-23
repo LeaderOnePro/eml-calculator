@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { one, evar, eml, type EmlNode, rpnLength } from "./types";
 import { toRpn, rpnString, fromRpn, parseRpn } from "./rpn";
 import { evaluate } from "./evaluator";
-import { C, isReal } from "./complex";
+import { C, isReal, exp, log } from "./complex";
 
 // Core identities from the paper, built directly as EML trees.
 const EXP = (a: EmlNode) => eml(a, one()); //                exp(a) = eml(a, 1)
@@ -55,6 +55,75 @@ describe("complex eml core", () => {
     expect(approx(evaluate(minus1).re, -1)).toBe(true);
     const z = evaluate(LN(minus1));
     expect(approx(Math.abs(z.im), Math.PI, 1e-6)).toBe(true);
+  });
+});
+
+describe("complex edge semantics (numpy mirror)", () => {
+  // These pin the IEEE edge behavior that lets degenerate programs (feeding
+  // zeros/infinities back through eml) agree bit-for-bit with numpy — the
+  // sign of zero and infinite-magnitude direction both matter. See the
+  // cross-check fixture entries at x = 0 (sinh, tanh, asinh, atanh).
+  const PI = Math.PI;
+  // sign of zero: 1/+0 → +1, 1/-0 → -Infinity (Math.sign(-0) is -0, falsy —
+  // so it cannot be used with || here)
+  const signed = (v: number) => (v === 0 ? (1 / v < 0 ? -1 : 1) : Math.sign(v));
+
+  it("exp(-inf + πj) = -0 + 0j  (phase survives as signed zero)", () => {
+    // cos(π) < 0 → re = -0; sin(π) is a tiny positive in double precision →
+    // im = +0. Matches numpy exactly.
+    const z = exp(C(-Infinity, PI));
+    expect(signed(z.re)).toBe(-1);
+    expect(signed(z.im)).toBe(1);
+  });
+
+  it("exp(-inf + 0j) = +0 + 0j", () => {
+    const z = exp(C(-Infinity, 0));
+    expect(signed(z.re)).toBe(1);
+    expect(signed(z.im)).toBe(1);
+  });
+
+  it("ln(-0 - 0j) = -inf - πj  (atan2 signed-zero rule, like numpy)", () => {
+    const z = log(C(-0, -0));
+    expect(z.re).toBe(-Infinity);
+    expect(approx(z.im, -PI)).toBe(true);
+  });
+
+  it("ln(0 + 0j) = -inf + 0j", () => {
+    const z = log(C(0, 0));
+    expect(z.re).toBe(-Infinity);
+    expect(signed(z.im)).toBe(1);
+  });
+
+  it("exp(inf + πj) = -inf + infj  (direction survives, no NaN)", () => {
+    const z = exp(C(Infinity, PI));
+    expect(z.re).toBe(-Infinity);
+    expect(z.im).toBe(Infinity);
+  });
+
+  it("exp(inf + 4j) = -inf - infj;  exp(inf + π/2·j) = inf + infj", () => {
+    const a = exp(C(Infinity, 4));
+    expect(a.re).toBe(-Infinity);
+    expect(a.im).toBe(-Infinity);
+    const b = exp(C(Infinity, PI / 2));
+    expect(b.re).toBe(Infinity);
+    expect(b.im).toBe(Infinity);
+  });
+
+  it("exp(inf + inf·j) = NaN + NaN·j;  exp(inf + nan·j) = inf + nan·j", () => {
+    const a = exp(C(Infinity, Infinity));
+    expect(Number.isNaN(a.re)).toBe(true);
+    expect(Number.isNaN(a.im)).toBe(true);
+    const b = exp(C(Infinity, NaN));
+    expect(b.re).toBe(Infinity);
+    expect(Number.isNaN(b.im)).toBe(true);
+  });
+
+  it("degenerate EML program: exp(-inf - πj) = -0 - 0j matches numpy", () => {
+    // numpy: sin(-π) < 0, so e^{-inf}·sin(-π) is -0 (not +0) — the phase sign
+    // rides through the underflowed magnitude.
+    const z = exp(C(-Infinity, -PI));
+    expect(signed(z.re)).toBe(-1);
+    expect(signed(z.im)).toBe(-1);
   });
 });
 
