@@ -16,7 +16,7 @@ from __future__ import annotations
 from fractions import Fraction
 
 from . import mathast as A
-from .tree import Eml, Node, ONE, Var
+from .tree import ONE, Eml, Node, Var
 
 # --- primitive macros -------------------------------------------------------
 

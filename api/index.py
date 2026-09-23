@@ -9,11 +9,10 @@ and the Next.js dev rewrite (see next.config.ts).
 
 from __future__ import annotations
 
-from fastapi import FastAPI
-from pydantic import BaseModel
-
 from emlcore.compile import compile_ast
 from emlcore.parser import parse_formula
+from fastapi import FastAPI
+from pydantic import BaseModel
 
 app = FastAPI(title="EML Calculator API", version="0.1.0")
 

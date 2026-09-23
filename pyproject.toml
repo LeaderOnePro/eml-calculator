@@ -15,9 +15,30 @@ dependencies = [
 dev = [
     "uvicorn[standard]>=0.30",
     "pytest>=8.0",
+    "ruff>=0.16",
 ]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
 addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+src = ["emlcore", "tests", "scripts", "api"]
+extend-exclude = [".venv"]
+
+[tool.ruff.lint]
+# Ruff's default rule set plus isort, pyupgrade, flake8-simplify, and bugbear —
+# a pragmatic baseline for a small, correctness-focused codebase.
+extend-select = ["I", "UP", "SIM", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# The API intentionally catches broad exceptions to return structured JSON
+# errors, and the verifier's sampling loop treats any reference-eval failure
+# as "x outside the reference domain".
+"api/*" = ["BLE001"]
+"emlcore/verify.py" = ["BLE001", "S112"]
+
+[tool.ruff.format]
+quote-style = "double"

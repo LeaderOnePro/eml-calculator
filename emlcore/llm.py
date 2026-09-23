@@ -50,6 +50,7 @@ inverse tangent of x              -> atan(x)
 hyperbolic cosine of 1           -> cosh(1)
 """
 
+
 def formula_from_nl(text: str, timeout: float = 20.0) -> str:
     """Translate free-form text to a supported formula string. Raises on failure."""
     key = os.environ.get("LONGCAT_API_KEY")

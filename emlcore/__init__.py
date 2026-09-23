@@ -2,10 +2,10 @@ from .compile import compile_ast
 from .evaluate import evaluate
 from .lower import lower
 from .tree import (
+    ONE,
     Eml,
     Node,
     One,
-    ONE,
     Var,
     depth,
     from_rpn,
@@ -19,21 +19,21 @@ from .tree import (
 from .verify import verify
 
 __all__ = [
-    "compile_ast",
-    "evaluate",
-    "lower",
-    "verify",
+    "ONE",
+    "Eml",
     "Node",
     "One",
     "Var",
-    "Eml",
-    "ONE",
-    "to_rpn",
-    "from_rpn",
-    "parse_rpn",
-    "rpn_string",
-    "rpn_length",
+    "compile_ast",
     "depth",
+    "evaluate",
+    "from_rpn",
     "leaves",
+    "lower",
+    "parse_rpn",
+    "rpn_length",
+    "rpn_string",
+    "to_rpn",
     "variables",
+    "verify",
 ]
