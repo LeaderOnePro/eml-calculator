@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Union
 
 
 @dataclass(frozen=True)
@@ -18,11 +17,11 @@ class Var:
 
 @dataclass(frozen=True)
 class Eml:
-    a: "Node"
-    b: "Node"
+    a: Node
+    b: Node
 
 
-Node = Union[One, Var, Eml]
+Node = One | Var | Eml
 
 ONE = One()
 

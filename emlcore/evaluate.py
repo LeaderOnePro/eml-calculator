@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from .tree import Eml, Node, One, Var
+from .tree import Node, One, Var
 
 
 def evaluate(node: Node, env: dict[str, complex] | None = None) -> complex:

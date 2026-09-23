@@ -5,7 +5,6 @@ import cmath
 import math
 
 import pytest
-
 from emlcore import (
     ONE,
     Eml,
@@ -13,7 +12,6 @@ from emlcore import (
     compile_ast,
     evaluate,
     from_rpn,
-    lower,
     parse_rpn,
     rpn_string,
     to_rpn,
@@ -22,11 +20,13 @@ from emlcore import mathast as A
 
 # --- RPN codec --------------------------------------------------------------
 
+
 def test_rpn_roundtrip_and_paper_ln_code():
     ln_x = parse_rpn("11xE1EE")  # paper's canonical ln program (K=7)
     assert rpn_string(ln_x) == "11xE1EE"
     assert rpn_string(from_rpn(to_rpn(ln_x))) == "11xE1EE"
     assert abs(evaluate(ln_x, {"x": 2}) - cmath.log(2)) < 1e-9
+
 
 def test_rpn_malformed_raises():
     with pytest.raises(ValueError):
@@ -34,7 +34,9 @@ def test_rpn_malformed_raises():
     with pytest.raises(ValueError):
         parse_rpn("11")  # stack size 2
 
+
 # --- core evaluator ---------------------------------------------------------
+
 
 def test_e_and_exp_codes():
     e = Eml(ONE, ONE)
@@ -44,6 +46,7 @@ def test_e_and_exp_codes():
     assert rpn_string(exp_x) == "x1E"
     assert abs(evaluate(exp_x, {"x": 2}) - math.exp(2)) < 1e-9
 
+
 def test_ln0_is_neg_inf_and_negation():
     def ln(b):
         return Eml(ONE, Eml(Eml(ONE, b), ONE))
@@ -52,6 +55,7 @@ def test_ln0_is_neg_inf_and_negation():
     assert evaluate(ln0).real == float("-inf")
     neg_x = Eml(ln0, Eml(Var("x"), ONE))  # -x, relies on e^{-inf}=0
     assert abs(evaluate(neg_x, {"x": 3}) + 3) < 1e-9
+
 
 # --- lowering + verification (the trust anchor) -----------------------------
 
@@ -70,6 +74,7 @@ CONSTANTS = [
     ("sqrt(2)", A.Func("sqrt", A.Num(2)), math.sqrt(2)),
 ]
 
+
 @pytest.mark.parametrize("name,ast,expected", CONSTANTS)
 def test_constant_compiles_and_verifies(name, ast, expected):
     r = compile_ast(ast)
@@ -77,11 +82,13 @@ def test_constant_compiles_and_verifies(name, ast, expected):
     got = complex(r["value"]["re"], r["value"]["im"])
     assert abs(got - expected) < 1e-6, f"{name}: got {got}, want {expected}"
 
+
 def test_imaginary_unit():
     r = compile_ast(A.ConstI())
     assert r["verified"]
     got = complex(r["value"]["re"], r["value"]["im"])
     assert abs(got - 1j) < 1e-6
+
 
 FUNCTIONS = [
     ("x^2", A.Pow(A.VarX(), A.Num(2))),
@@ -91,11 +98,13 @@ FUNCTIONS = [
     ("1/x", A.Div(A.Num(1), A.VarX())),
 ]
 
+
 @pytest.mark.parametrize("name,ast", FUNCTIONS)
 def test_function_compiles_and_verifies(name, ast):
     r = compile_ast(ast)
     assert r["verified"], f"{name} failed verify (max_err={r['max_err']})"
     assert r["variables"] == ["x"]
+
 
 def test_paper_k_values():
     assert compile_ast(A.ConstE())["k"] == 3  # e   -> 11E
@@ -103,12 +112,22 @@ def test_paper_k_values():
     assert compile_ast(A.Func("ln", A.VarX()))["k"] == 7  # lnx -> 11xE1EE
     assert compile_ast(A.Num(0))["k"] == 7  # 0   -> 111E1EE
 
+
 TRANSCENDENTAL = [
-    "sin", "cos", "tan",
-    "asin", "acos", "atan",
-    "sinh", "cosh", "tanh",
-    "asinh", "acosh", "atanh",
+    "sin",
+    "cos",
+    "tan",
+    "asin",
+    "acos",
+    "atan",
+    "sinh",
+    "cosh",
+    "tanh",
+    "asinh",
+    "acosh",
+    "atanh",
 ]
+
 
 @pytest.mark.parametrize("fn", TRANSCENDENTAL)
 def test_transcendental_compiles_and_verifies(fn):
@@ -118,13 +137,16 @@ def test_transcendental_compiles_and_verifies(fn):
     assert r["verified"], f"{fn}(x) failed verify (max_err={r['max_err']})"
     assert r["variables"] == ["x"]
 
+
 def test_function_aliases():
     from emlcore.parser import parse_formula
 
     for a, b in [("arcsin(x)", "asin(x)"), ("arctan(x)", "atan(x)"), ("arcosh(x)", "acosh(x)")]:
         assert compile_ast(parse_formula(a))["rpn"] == compile_ast(parse_formula(b))["rpn"]
 
+
 # --- prompt / parser drift guard --------------------------------------------
+
 
 def test_llm_prompt_covers_supported_functions():
     """The NL fallback prompt must advertise every function the parser can

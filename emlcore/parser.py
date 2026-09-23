@@ -42,20 +42,35 @@ _GRAMMAR = r"""
 """
 
 _SUPPORTED_FUNCS = {
-    "exp", "ln", "sqrt",
-    "sin", "cos", "tan",
-    "asin", "acos", "atan",
-    "sinh", "cosh", "tanh",
-    "asinh", "acosh", "atanh",
+    "exp",
+    "ln",
+    "sqrt",
+    "sin",
+    "cos",
+    "tan",
+    "asin",
+    "acos",
+    "atan",
+    "sinh",
+    "cosh",
+    "tanh",
+    "asinh",
+    "acosh",
+    "atanh",
 }
 
 # normalize common spellings to the canonical names above
 _ALIASES = {
     "log": "ln",
-    "arcsin": "asin", "arccos": "acos", "arctan": "atan",
-    "arsinh": "asinh", "arcsinh": "asinh",
-    "arcosh": "acosh", "arccosh": "acosh",
-    "artanh": "atanh", "arctanh": "atanh",
+    "arcsin": "asin",
+    "arccos": "acos",
+    "arctan": "atan",
+    "arsinh": "asinh",
+    "arcsinh": "asinh",
+    "arcosh": "acosh",
+    "arccosh": "acosh",
+    "artanh": "atanh",
+    "arctanh": "atanh",
 }
 
 
