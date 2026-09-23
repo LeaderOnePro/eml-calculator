@@ -37,9 +37,29 @@ for f in ["2*3", "1/2", "sqrt(2)", "i", "pi", "-1", "2+3", "6/2"]:
     add(compile_ast(parse_formula(f))["rpn"])
 
 # compiled functions, sampled at several x
-for f in ["x^2", "e^x", "ln(x)", "2*x", "1/x", "sin(x)", "cos(x)", "atan(x)"]:
+#
+# Inverse-function sampling points stay inside each domain so the EML program
+# and the reference evaluator agree on the principal branch: asin/acos on
+# [-1, 1], atanh on (-1, 1), acosh on [1, inf), asinh everywhere. Samples near
+# ±0.9 also exercise the endpoints of the real branch cuts.
+for f in ["x^2", "e^x", "ln(x)", "2*x", "1/x", "sin(x)", "cos(x)", "tan(x)"]:
     rpn = compile_ast(parse_formula(f))["rpn"]
     for x in [0.5, 1.7, 3.2]:
+        add(rpn, x)
+
+for f, xs in [
+    ("asin(x)", [-0.9, 0.0, 0.9]),
+    ("acos(x)", [-0.9, 0.0, 0.9]),
+    ("atan(x)", [-3.0, 0.0, 3.0]),
+    ("sinh(x)", [-1.0, 0.0, 1.0]),
+    ("cosh(x)", [-1.0, 0.5, 1.0]),
+    ("tanh(x)", [-2.0, 0.0, 2.0]),
+    ("asinh(x)", [-1.0, 0.0, 1.0]),
+    ("acosh(x)", [1.0, 1.5, 3.0]),
+    ("atanh(x)", [-0.9, 0.0, 0.9]),
+]:
+    rpn = compile_ast(parse_formula(f))["rpn"]
+    for x in xs:
         add(rpn, x)
 
 out = os.path.join(os.path.dirname(__file__), "..", "lib", "eml", "__fixtures__", "crosscheck.json")
