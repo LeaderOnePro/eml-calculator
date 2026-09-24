@@ -2,7 +2,8 @@
 
 The model's ONLY job is translation to a formula string; that string is then
 re-parsed by the deterministic parser and numerically verified, so the LLM can
-never bypass correctness checks. Uses LongCat-2.0 via the OpenAI-compatible API.
+never bypass correctness checks. Uses Agnes 3.0 Flash via the OpenAI-compatible
+API (base https://apihub.agnes-ai.com/v1).
 
 The grammar advertised in _SYSTEM must cover every function in
 parser._SUPPORTED_FUNCS — the drift guard is
@@ -13,8 +14,8 @@ from __future__ import annotations
 
 import os
 
-_MODEL = "LongCat-2.0"
-_BASE_URL = "https://api.longcat.chat/openai"
+_MODEL = "agnes-3.0-flash"
+_BASE_URL = "https://apihub.agnes-ai.com/v1"
 
 # Grammar block. The function list below mirrors parser._SUPPORTED_FUNCS
 # (the parser also accepts aliases such as log / arcsin, but the canonical
@@ -53,9 +54,9 @@ hyperbolic cosine of 1           -> cosh(1)
 
 def formula_from_nl(text: str, timeout: float = 20.0) -> str:
     """Translate free-form text to a supported formula string. Raises on failure."""
-    key = os.environ.get("LONGCAT_API_KEY")
+    key = os.environ.get("AGNES_API_KEY")
     if not key:
-        raise RuntimeError("LONGCAT_API_KEY is not set")
+        raise RuntimeError("AGNES_API_KEY is not set")
 
     # Imported lazily so the module (and health route) load even without openai.
     from openai import OpenAI
