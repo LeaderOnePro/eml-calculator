@@ -73,6 +73,7 @@ the browser makes same‑origin requests.
 ```bash
 pnpm test                 # TS core (vitest)
 uv run pytest             # Python core (golden tests)
+uv run ruff check .       # Python lint (CI enforces this + ruff format --check)
 ```
 
 ### Configuration
