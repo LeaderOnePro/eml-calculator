@@ -18,17 +18,24 @@ _GRAMMAR = r"""
         | sum "-" product   -> sub
         | product
 
-    ?product: product "*" power   -> mul
-            | product "/" power   -> div
-            | power
+    ?product: product "*" unary   -> mul
+            | product "/" unary   -> div
+            | unary
 
-    ?power: unary "^" power    -> pow
-          | unary "**" power   -> pow
-          | unary
+    # Unary minus binds looser than '^': -2^2 = -(2^2) = -4, matching the
+    # convention of Python, Desmos, WolframAlpha and Google. The exponent
+    # position still accepts a leading '-' so 2^-2 keeps working.
+    ?power: atom "^" unary_pow   -> pow
+          | atom "**" unary_pow  -> pow
+          | atom
+
+    ?unary_pow: "-" unary_pow   -> neg
+              | "+" unary_pow   -> pos
+              | power
 
     ?unary: "-" unary   -> neg
           | "+" unary   -> pos
-          | atom
+          | power
 
     ?atom: NUMBER             -> num
          | NAME "(" sum ")"   -> func
