@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatComplex } from "@/lib/eml";
 
 type CompileResult = {
@@ -24,10 +24,20 @@ export default function AiPanel({ onCompiled }: { onCompiled: (rpn: string) => v
   const [formula, setFormula] = useState("");
   const [loading, setLoading] = useState(false);
   const [res, setRes] = useState<CompileResult | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  // Abort any in-flight request when the panel unmounts.
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   const compile = async (f?: string) => {
     const input = (f ?? formula).trim();
     if (!input) return;
+    // Replace semantics: a new request cancels the in-flight one, so the
+    // result shown always belongs to the last request initiated — and two
+    // requests can never be in flight at once (no duplicate LLM calls).
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     if (f) setFormula(f);
     setLoading(true);
     setRes(null);
@@ -36,12 +46,15 @@ export default function AiPanel({ onCompiled }: { onCompiled: (rpn: string) => v
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ formula: input }),
+        signal: controller.signal,
       });
       setRes(await r.json());
     } catch (e) {
+      if (controller.signal.aborted) return; // superseded by a newer request
       setRes({ ok: false, error: String(e), stage: "network" });
     } finally {
-      setLoading(false);
+      // Only the still-current request may clear the loading flag.
+      if (abortRef.current === controller) setLoading(false);
     }
   };
 
