@@ -258,6 +258,104 @@ def test_parser_still_accepts_euler_e_after_number_literals():
         assert r["verified"] and abs(got - expected) < 1e-6, f"{formula}: got {got}"
 
 
+# --- verifier rejection paths (the trust anchor's negative space) -----------
+# verify() is the only thing standing between a wrong EML program and a
+# verified=true badge. These tests pin its REJECTION behaviour, not just its
+# acceptance: a swapped/mismatched program, an out-of-tolerance error, and
+# domain edges must all fail loudly.
+
+
+def test_verifier_rejects_mismatched_program():
+    """A program that does not compute the AST's function must be rejected.
+    This is the anti-tofu property: swapping the tree under an AST cannot
+    produce a verified result."""
+    from emlcore import mathast as A
+    from emlcore.lower import lower
+    from emlcore.verify import verify
+
+    v = verify(lower(A.VarX()), A.Func("sqrt", A.Num(2)))  # tree=x, claim=sqrt(2)
+    assert not v["ok"]
+    assert v["max_err"] > 1.0
+
+
+def test_verifier_rejects_wrong_constant():
+    from emlcore import mathast as A
+    from emlcore.lower import lower
+    from emlcore.verify import verify
+
+    v = verify(lower(A.Num(2)), A.Num(5))
+    assert not v["ok"]
+    assert v["max_err"] == 3.0
+
+
+def test_verifier_tolerance_is_enforced():
+    """verify() must actually compare error against tol: a tolerance far below
+    the construction's numerical error (sqrt(2) errs ~4e-17) must reject."""
+    from emlcore import mathast as A
+    from emlcore.lower import lower
+    from emlcore.verify import verify
+
+    ast = A.Func("sqrt", A.Num(2))
+    node = lower(ast)
+    assert verify(node, ast, tol=1e-6)["ok"]
+    assert not verify(node, ast, tol=1e-20)["ok"]
+
+
+def test_verifier_skips_samples_outside_reference_domain():
+    """Points where the reference evaluator raises count as out-of-domain and
+    are skipped, not failures: asin(x-3) is real only at x=2.3 and 3.3."""
+    from emlcore import mathast as A
+    from emlcore.lower import lower
+    from emlcore.verify import DEFAULT_SAMPLES, verify
+
+    ast = A.Func("asin", A.Sub(A.VarX(), A.Num(3)))
+    v = verify(lower(ast), ast)
+    assert v["ok"]
+    assert [c["x"] for c in v["checks"]] == [2.3, 3.3]
+    assert len(DEFAULT_SAMPLES) == 6  # 4 of 6 samples were skipped
+
+
+def test_verifier_rejects_when_reference_fails_at_every_sample():
+    """If the reference evaluator errors at every sample there is no evidence —
+    the result must be unverified with no checks, not vacuously true. Reachable
+    when the AST is structurally broken relative to the tree (here: a function
+    name ref_eval does not know)."""
+    from emlcore import mathast as A
+    from emlcore.lower import lower
+    from emlcore.verify import verify
+
+    node = lower(A.VarX())
+    ast = A.Func("totally_bogus", A.VarX())  # ref_eval raises at every sample
+    v = verify(node, ast)
+    assert not v["ok"]
+    assert v["checks"] == []
+
+
+def test_verifier_raises_on_structurally_invalid_pairing():
+    """A constant tree against a variable-requiring AST is a programmer error:
+    the constant branch calls ref_eval without an env, which raises unbound-
+    variable. verify fails fast rather than silently returning garbage."""
+    from emlcore import mathast as A
+    from emlcore.lower import lower
+    from emlcore.verify import verify
+
+    with pytest.raises(ValueError):
+        verify(lower(A.Num(2)), A.Func("ln", A.VarX()))
+
+
+def test_verifier_falls_back_to_complex_comparison():
+    """Functions that are complex-valued on the reals (e^{ix}) are compared on
+    the full complex samples, not dropped for having no real points."""
+    from emlcore import mathast as A
+    from emlcore.lower import lower
+    from emlcore.verify import verify
+
+    ast = A.Func("exp", A.Mul(A.ConstI(), A.VarX()))
+    v = verify(lower(ast), ast)
+    assert v["ok"]
+    assert any(c["expect"].imag != 0 for c in v["checks"])
+
+
 # --- prompt / parser drift guard --------------------------------------------
 
 
