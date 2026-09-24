@@ -9,12 +9,30 @@ and the Next.js dev rewrite (see next.config.ts).
 
 from __future__ import annotations
 
+import time
+
 from emlcore.compile import compile_ast
 from emlcore.parser import parse_formula
-from fastapi import FastAPI
-from pydantic import BaseModel
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 
 app = FastAPI(title="EML Calculator API", version="0.1.0")
+
+# A formula that actually needs the LLM fallback is a sentence; anything past a
+# few hundred chars is payload abuse (the deterministic parser fails on it long
+# before the LLM could help). Cap *before* touching the parser or the LLM.
+MAX_FORMULA_CHARS = 500
+
+# Rate limiting for the LLM fallback. This is a per-process in-memory window —
+# cheap and enough to blunt naive abuse on a single-instance serverless
+# deployment; not a distributed guarantee. Vercel firewall/WAF rules remain the
+# first line of defense for real traffic spikes.
+RATE_LIMIT_REQUESTS = 10
+RATE_LIMIT_WINDOW_SECONDS = 60.0
+
+_llm_hits: list[float] = []
 
 
 @app.get("/api/health")
@@ -23,7 +41,32 @@ def health() -> dict:
 
 
 class CompileRequest(BaseModel):
-    formula: str
+    formula: str = Field(default="", max_length=MAX_FORMULA_CHARS)
+
+
+@app.exception_handler(RequestValidationError)
+async def _validation_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    """Return 400 with our error envelope for oversized/invalid bodies, so the
+    frontend shows its normal error card instead of a raw FastAPI 422."""
+    del request
+    errors = exc.errors()
+    msg = str(errors[0].get("msg")) if errors else "invalid request"
+    return JSONResponse(
+        status_code=400,
+        content={"ok": False, "stage": "input", "error": msg or "invalid request"},
+    )
+
+
+def _llm_allowed() -> bool:
+    """Sliding-window check for LLM-fallback calls. Prunes expired hits first."""
+    now = time.monotonic()
+    cutoff = now - RATE_LIMIT_WINDOW_SECONDS
+    while _llm_hits and _llm_hits[0] < cutoff:
+        _llm_hits.pop(0)
+    if len(_llm_hits) >= RATE_LIMIT_REQUESTS:
+        return False
+    _llm_hits.append(now)
+    return True
 
 
 @app.post("/api/compile")
@@ -40,10 +83,25 @@ def compile_endpoint(req: CompileRequest) -> dict:
 
     source = "parser"
     interpreted = formula
+    ast = None
+    parse_err: Exception | None = None
     try:
         ast = parse_formula(formula)
-    except Exception as parse_err:
-        # Fallback: ask LongCat-2.0 to translate, then re-parse deterministically.
+    except Exception as err:
+        parse_err = err
+
+    if ast is None:
+        if not _llm_allowed():
+            return {
+                "ok": False,
+                "stage": "rate-limit",
+                "input": formula,
+                "error": (
+                    "too many natural-language requests; retry in a minute "
+                    f"(limit: {RATE_LIMIT_REQUESTS}/{int(RATE_LIMIT_WINDOW_SECONDS)}s)"
+                ),
+            }
+        # Fallback: ask the LLM to translate, then re-parse deterministically.
         try:
             from emlcore.llm import formula_from_nl
 
