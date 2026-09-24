@@ -35,6 +35,45 @@ def test_rpn_malformed_raises():
         parse_rpn("11")  # stack size 2
 
 
+def test_rpn_roundtrip_multi_variable_trees():
+    """Deterministic sweep over mixed single- and multi-char variable names:
+    token round-trip must be the identity, K must equal the token count, and
+    multi-char names must force the spaced encoding."""
+    import random
+
+    from emlcore.tree import Eml, Var, depth, rpn_length
+
+    rng = random.Random(0x9E3779B9)
+    names = ["x", "y", "var", "A1", "z9"]
+
+    def gen(d):
+        if d == 0 or rng.random() < 0.25:
+            return ONE if rng.random() < 0.2 else Var(rng.choice(names))
+        return Eml(gen(d - 1), gen(d - 1))
+
+    for _ in range(200):
+        node = gen(5)
+        tokens = to_rpn(node)
+        back = from_rpn(tokens)
+        assert to_rpn(back) == tokens  # exact structural identity
+        assert rpn_length(back) == len(tokens)
+        assert depth(back) == depth(node)
+
+
+def test_rpn_rejects_reserved_variable_names():
+    """A var named '1' or 'E' would silently decode as a different tree, so
+    creation fails loudly instead. Multi-char names are fine (spaced form)."""
+    from emlcore.tree import Var
+
+    for name in ("1", "E", "eml"):
+        with pytest.raises(ValueError):
+            Var(name)
+
+    node = Eml(ONE, Var("var"))
+    assert rpn_string(node) == "1 var E"
+    assert rpn_string(from_rpn(to_rpn(node))) == "1 var E"
+
+
 # --- core evaluator ---------------------------------------------------------
 
 

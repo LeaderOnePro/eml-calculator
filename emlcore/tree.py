@@ -14,6 +14,10 @@ class One:
 class Var:
     name: str
 
+    def __post_init__(self):
+        if self.name in _RESERVED_VAR_NAMES:
+            raise ValueError(f"variable name '{self.name}' collides with the RPN alphabet")
+
 
 @dataclass(frozen=True)
 class Eml:
@@ -24,6 +28,11 @@ class Eml:
 Node = One | Var | Eml
 
 ONE = One()
+
+# Names the RPN alphabet reserves. A variable holding one of these would
+# silently round-trip into a different tree (Var("1") -> the terminal 1,
+# Var("E") -> an eml application), so creation fails loudly instead.
+_RESERVED_VAR_NAMES = ("1", "E", "eml")
 
 
 def leaves(n: Node) -> int:

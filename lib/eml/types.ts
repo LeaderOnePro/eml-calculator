@@ -6,8 +6,18 @@ export type EmlNode =
   | { t: "var"; name: string }
   | { t: "eml"; a: EmlNode; b: EmlNode };
 
+// Names the RPN alphabet reserves. A variable holding one of these would
+// silently round-trip into a different tree (evar("1") -> the terminal 1,
+// evar("E") -> an eml application), so creation fails loudly instead.
+const RESERVED_VAR_NAMES = ["1", "E", "eml"];
+
 export const one = (): EmlNode => ({ t: "one" });
-export const evar = (name: string): EmlNode => ({ t: "var", name });
+export const evar = (name: string): EmlNode => {
+  if (RESERVED_VAR_NAMES.includes(name)) {
+    throw new Error(`variable name '${name}' collides with the RPN alphabet`);
+  }
+  return { t: "var", name };
+};
 export const eml = (a: EmlNode, b: EmlNode): EmlNode => ({ t: "eml", a, b });
 
 /** Number of leaf terminals (1s and variables). */

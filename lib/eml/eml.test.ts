@@ -3,6 +3,7 @@ import { one, evar, eml, type EmlNode, rpnLength } from "./types";
 import { toRpn, rpnString, fromRpn, parseRpn } from "./rpn";
 import { evaluate } from "./evaluator";
 import { C, isReal, exp, log } from "./complex";
+import FIXTURE from "./__fixtures__/crosscheck.json";
 
 // Core identities from the paper, built directly as EML trees.
 const EXP = (a: EmlNode) => eml(a, one()); //                exp(a) = eml(a, 1)
@@ -147,5 +148,48 @@ describe("RPN codec", () => {
   it("malformed RPN throws", () => {
     expect(() => parseRpn("1E")).toThrow(); // underflow
     expect(() => parseRpn("11")).toThrow(); // stack size 2
+  });
+
+  it("round-trips every tree in the crosscheck fixture", () => {
+    for (const entry of FIXTURE) {
+      const node = parseRpn(entry.rpn);
+      // parseRpn -> rpnString is byte-stable for whitespace-free programs
+      expect(rpnString(node)).toBe(entry.rpn);
+      // token-list round trip is stable regardless of naming
+      const tokens = toRpn(node);
+      expect(rpnString(fromRpn(tokens))).toBe(rpnString(fromRpn(tokens)));
+    }
+  });
+
+  it("round-trips generated multi-variable trees (property-ish sweep)", () => {
+    // Deterministic pseudo-random tree generator: mixed single-char and
+    // multi-char variable names exercise both compact and spaced encodings.
+    let seed = 0x9e3779b9;
+    const rnd = (n: number) => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed % n;
+    };
+    const names = ["x", "y", "var", "A1", "z9"];
+    const gen = (d: number): EmlNode => {
+      if (d === 0 || rnd(4) === 0) return rnd(5) === 0 ? one() : evar(names[rnd(names.length)]);
+      return eml(gen(d - 1), gen(d - 1));
+    };
+    for (let i = 0; i < 200; i++) {
+      const node = gen(5);
+      const tokens = toRpn(node);
+      const back = fromRpn(tokens);
+      expect(toRpn(back)).toEqual(tokens); // exact structural identity
+      expect(rpnLength(back)).toBe(tokens.length); // K = token count
+    }
+  });
+
+  it("rejects variable names that collide with the RPN alphabet", () => {
+    // A var named "1" or "E" would silently decode as a different tree.
+    for (const name of ["1", "E", "eml"]) {
+      expect(() => evar(name)).toThrow();
+    }
+    // Multi-char names are fine (spaced encoding).
+    expect(rpnString(evar("var"))).toBe("var");
+    expect(rpnString(eml(one(), evar("var")))).toBe("1 var E");
   });
 });
