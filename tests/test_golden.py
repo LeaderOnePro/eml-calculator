@@ -145,6 +145,55 @@ def test_function_aliases():
         assert compile_ast(parse_formula(a))["rpn"] == compile_ast(parse_formula(b))["rpn"]
 
 
+# --- unary minus vs '^' precedence ------------------------------------------
+# Convention check: Python, Desmos, WolframAlpha and Google all parse -2^2 as
+# -(2^2). The grammar previously bound '-' tighter than '^', so -2^2 = 4 — and
+# the verifier could not catch it because ref_eval shares the same (wrong) AST.
+# These tests pin the corrected binding; the exponent position still accepts a
+# leading '-', keeping 2^-2 usable.
+
+
+@pytest.mark.parametrize(
+    "formula,expected",
+    [
+        ("-2^2", -4.0),
+        ("-2**2", -4.0),
+        ("-2^-2", -0.25),
+        ("2^-2", 0.25),
+        ("(-2)^2", 4.0),
+        ("1-2^2", -3.0),
+        ("-3", -3.0),
+    ],
+)
+def test_unary_minus_binds_looser_than_power(formula, expected):
+    from emlcore.parser import parse_formula
+
+    r = compile_ast(parse_formula(formula))
+    assert r["verified"], f"{formula} failed verify (max_err={r['max_err']})"
+    got = complex(r["value"]["re"], r["value"]["im"])
+    assert abs(got - expected) < 1e-6, f"{formula}: got {got}, want {expected}"
+
+
+@pytest.mark.parametrize(
+    "formula,x,expected",
+    [
+        ("-x^2", 1.5, -2.25),
+        ("2^-x", 2.0, 0.25),
+        ("-sin(x)^2", 1.0, -(math.sin(1.0) ** 2)),
+    ],
+)
+def test_unary_minus_variable_power(formula, x, expected):
+    """End-to-end: the lowered EML program (not just the AST) must agree with
+    the reference evaluator and the expected value at a sample point."""
+    from emlcore.parser import parse_formula
+
+    ast = parse_formula(formula)
+    r = compile_ast(ast)
+    assert r["verified"], f"{formula} failed verify (max_err={r['max_err']})"
+    got = evaluate(parse_rpn(r["rpn"]), {"x": complex(x)})
+    assert abs(got - expected) < 1e-9, f"{formula} at x={x}: got {got}, want {expected}"
+
+
 # --- prompt / parser drift guard --------------------------------------------
 
 
