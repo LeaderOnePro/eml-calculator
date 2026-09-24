@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import {
   type EmlNode,
   one,
@@ -17,57 +17,82 @@ import { EmlTree } from "./EmlTree";
 
 export type PlayRequest = { rpn: string; id: number };
 
+// Stack + undo history live in one reducer so every transition is a pure,
+// atomic state update — no setState-inside-updater, no setState-in-effect.
+type State = { stack: EmlNode[]; past: EmlNode[][] };
+
+type Action =
+  | { type: "push-one" }
+  | { type: "eml" }
+  | { type: "undo" }
+  | { type: "clear" }
+  | { type: "reset" } // demo replay: wipe history and stack
+  | { type: "show"; built: EmlNode[] }; // demo replay: one animation frame
+
+function reducer(state: State, action: Action): State {
+  switch (action.type) {
+    case "push-one":
+      return { stack: [...state.stack, one()], past: [...state.past, state.stack] };
+    case "eml": {
+      const { stack } = state;
+      if (stack.length < 2) return state;
+      const a = stack[stack.length - 2];
+      const b = stack[stack.length - 1];
+      return { stack: [...stack.slice(0, -2), eml(a, b)], past: [...state.past, stack] };
+    }
+    case "undo": {
+      if (state.past.length === 0) return state;
+      return { stack: state.past[state.past.length - 1], past: state.past.slice(0, -1) };
+    }
+    case "clear":
+      return state.stack.length === 0 ? state : { stack: [], past: [...state.past, state.stack] };
+    case "reset":
+      return { stack: [], past: [] };
+    case "show":
+      return { stack: action.built, past: state.past };
+  }
+}
+
 export default function Calculator({ play }: { play?: PlayRequest }) {
-  const [stack, setStack] = useState<EmlNode[]>([]);
-  const [past, setPast] = useState<EmlNode[][]>([]);
+  const [state, dispatch] = useReducer(reducer, { stack: [], past: [] });
+  const { stack, past } = state;
   const [showTree, setShowTree] = useState(true);
   const playTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const top = stack[stack.length - 1] as EmlNode | undefined;
   const canEml = stack.length >= 2;
 
-  const commit = useCallback(
-    (next: EmlNode[]) => {
-      setPast((p) => [...p, stack]);
-      setStack(next);
-    },
-    [stack],
-  );
-
-  const push1 = useCallback(() => commit([...stack, one()]), [stack, commit]);
-
-  const doEml = useCallback(() => {
-    if (stack.length < 2) return;
-    const a = stack[stack.length - 2];
-    const b = stack[stack.length - 1];
-    commit([...stack.slice(0, -2), eml(a, b)]);
-  }, [stack, commit]);
-
-  const undo = useCallback(() => {
-    setPast((p) => {
-      if (p.length === 0) return p;
-      setStack(p[p.length - 1]);
-      return p.slice(0, -1);
-    });
-  }, []);
-
-  const clear = useCallback(() => commit([]), [commit]);
+  const push1 = useCallback(() => dispatch({ type: "push-one" }), []);
+  const doEml = useCallback(() => dispatch({ type: "eml" }), []);
+  const undo = useCallback(() => dispatch({ type: "undo" }), []);
+  const clear = useCallback(() => dispatch({ type: "clear" }), []);
 
   // Keyboard: 1 pushes, e/Enter applies eml, Backspace undoes, Esc clears.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
-      if (e.key === "1") (e.preventDefault(), push1());
-      else if (e.key === "e" || e.key === "Enter") (e.preventDefault(), doEml());
-      else if (e.key === "Backspace") (e.preventDefault(), undo());
-      else if (e.key === "Escape") (e.preventDefault(), clear());
+      if (e.key === "1") {
+        e.preventDefault();
+        push1();
+      } else if (e.key === "e" || e.key === "Enter") {
+        e.preventDefault();
+        doEml();
+      } else if (e.key === "Backspace") {
+        e.preventDefault();
+        undo();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        clear();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [push1, doEml, undo, clear]);
 
   // "One-click demo": replay an RPN program token-by-token onto the calculator.
+  // EmlApp stamps every play request with a fresh id, so depending on `play`
+  // (object identity) restarts the replay exactly when a new request arrives.
   useEffect(() => {
     if (!play) return;
     if (playTimer.current) clearInterval(playTimer.current);
@@ -76,8 +101,7 @@ export default function Calculator({ play }: { play?: PlayRequest }) {
     // Adaptive speed: short programs animate slowly (~220ms/press); large ones
     // (a trig function can be hundreds of presses) finish within ~5s total.
     const interval = Math.max(8, Math.min(220, Math.round(5000 / tokens.length)));
-    setPast([]);
-    setStack([]);
+    dispatch({ type: "reset" });
     const built: EmlNode[] = [];
     let i = 0;
     playTimer.current = setInterval(() => {
@@ -92,13 +116,12 @@ export default function Calculator({ play }: { play?: PlayRequest }) {
         if (a && b) built.push(eml(a, b));
       } else if (tok === "1") built.push(one());
       else built.push(evar(tok));
-      setStack([...built]);
+      dispatch({ type: "show", built: [...built] });
     }, interval);
     return () => {
       if (playTimer.current) clearInterval(playTimer.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [play?.id]);
+  }, [play]);
 
   const display = useMemo(() => {
     if (!top) return { value: "0", hint: "press 1 to begin", isFunc: false };
