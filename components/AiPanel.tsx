@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { formatComplex } from "@/lib/eml";
 
 type CompileResult = {
   ok: boolean;
@@ -18,20 +19,6 @@ type CompileResult = {
 };
 
 const EXAMPLES = ["sin(x)", "cos(x)", "tan(x)", "e^(i*pi)", "sqrt(2)", "ln(2)", "atan(x)", "pi"];
-
-function fmtValue(v: { re: number; im: number }): string {
-  const snap = (x: number) =>
-    Math.abs(x) < 1e-9
-      ? 0
-      : Math.abs(x - Math.round(x)) < 1e-9
-        ? Math.round(x)
-        : parseFloat(x.toPrecision(8));
-  const re = snap(v.re);
-  const im = snap(v.im);
-  if (im === 0) return String(re);
-  if (re === 0) return `${im}i`;
-  return `${re} ${im < 0 ? "−" : "+"} ${Math.abs(im)}i`;
-}
 
 export default function AiPanel({ onCompiled }: { onCompiled: (rpn: string) => void }) {
   const [formula, setFormula] = useState("");
@@ -114,7 +101,9 @@ export default function AiPanel({ onCompiled }: { onCompiled: (rpn: string) => v
                 </div>
               )}
               {res.value && (
-                <div className="mt-2 font-mono text-2xl text-emerald-300">{fmtValue(res.value)}</div>
+                <div className="mt-2 font-mono text-2xl text-emerald-300">
+                  {formatComplex(res.value)}
+                </div>
               )}
               {res.variables && res.variables.length > 0 && (
                 <div className="mt-2 font-mono text-sm text-sky-300">ƒ({res.variables.join(", ")})</div>
