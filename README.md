@@ -77,10 +77,11 @@ uv run pytest             # Python core (golden tests)
 
 ### Configuration
 
-The LLM fallback needs a LongCat key, server‑side only:
+The LLM fallback uses **Agnes 3.0 Flash** via its OpenAI-compatible API
+(`https://apihub.agnes-ai.com/v1`). The key is server-side only:
 
 ```bash
-export LONGCAT_API_KEY=...      # or copy .env.example → .env.local
+export AGNES_API_KEY=...        # or copy .env.example → .env.local
 ```
 
 ## Deploy
@@ -88,7 +89,7 @@ export LONGCAT_API_KEY=...      # or copy .env.example → .env.local
 One Vercel project serves both the Next.js frontend and the Python API. The
 FastAPI app in `api/index.py` becomes a single serverless function; `vercel.json`
 rewrites `/api/*` to it, and Python dependencies come from `pyproject.toml` +
-`uv.lock`. Set `LONGCAT_API_KEY` in the project's environment variables.
+`uv.lock`. Set `AGNES_API_KEY` in the project's environment variables.
 
 > Deployed and verified end-to-end at
 > [eml-calculator.vercel.app](https://eml-calculator.vercel.app): the frontend, the

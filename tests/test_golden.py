@@ -212,3 +212,50 @@ def test_llm_prompt_covers_supported_functions():
 
     missing = [fn for fn in _SUPPORTED_FUNCS if fn not in _SYSTEM]
     assert not missing, f"LLM prompt missing function(s): {sorted(missing)}"
+
+
+def test_llm_provider_is_agnes():
+    """The fallback targets Agnes 3.0 Flash's OpenAI-compatible endpoint and
+    reads the key from AGNES_API_KEY."""
+    from emlcore import llm
+
+    assert llm._MODEL == "agnes-3.0-flash"
+    assert llm._BASE_URL == "https://apihub.agnes-ai.com/v1"
+
+
+# --- /api/compile abuse guards -----------------------------------------------
+
+
+def test_compile_rejects_oversized_formula():
+    """Input past the cap is rejected before the parser or the LLM is touched."""
+    from api.index import MAX_FORMULA_CHARS, app
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    r = client.post("/api/compile", json={"formula": "x" * (MAX_FORMULA_CHARS + 1)})
+    assert r.status_code == 400
+    body = r.json()
+    assert body["ok"] is False
+    assert body["stage"] == "input"
+
+
+def test_compile_rate_limited_after_burst():
+    """The LLM fallback is rate-limited: unparseable formulas burn the budget,
+    then get a structured rate-limit response instead of an LLM call."""
+    from api.index import RATE_LIMIT_REQUESTS, app
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    garbage = "hello world this is not math"
+    saw_limit = False
+    for _ in range(RATE_LIMIT_REQUESTS + 2):
+        body = client.post("/api/compile", json={"formula": garbage}).json()
+        if body.get("stage") == "rate-limit":
+            saw_limit = True
+            assert body["ok"] is False
+            break
+    assert saw_limit, "expected a rate-limit response within the burst"
+
+    # Deterministic formulas bypass the LLM entirely and must still work.
+    body = client.post("/api/compile", json={"formula": "sin(x)"}).json()
+    assert body["ok"] is True and body["source"] == "parser"
