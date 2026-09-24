@@ -194,6 +194,70 @@ def test_unary_minus_variable_power(formula, x, expected):
     assert abs(got - expected) < 1e-9, f"{formula} at x={x}: got {got}, want {expected}"
 
 
+# --- numeric literal forms (scientific notation, leading dot) ----------------
+
+
+@pytest.mark.parametrize(
+    "formula,expected",
+    [
+        ("1e-3", 0.001),
+        ("1E-3", 0.001),
+        ("2.5e-4", 2.5e-4),
+        ("1e6", 1e6),
+        ("1.23e5", 123000.0),
+        ("6.02e23", 6.02e23),
+        ("1.6e-19", 1.6e-19),
+        (".5", 0.5),
+        ("2.", 2.0),
+        ("9.81", 9.81),
+        ("-9.81", -9.81),
+        ("1000", 1000),
+        ("1023", 1023),
+        ("-700", -700),
+    ],
+)
+def test_numeric_literal_forms_compile_and_verify(formula, expected):
+    """Scientific notation and leading-dot forms must lower to verified EML
+    programs reproducing the input value (the input carries its own precision)."""
+    from emlcore.parser import parse_formula
+
+    r = compile_ast(parse_formula(formula))
+    assert r["verified"], f"{formula} failed verify (max_err={r['max_err']})"
+    got = complex(r["value"]["re"], r["value"]["im"])
+    assert abs(got - expected) <= abs(expected) * 1e-9 + 1e-15, (
+        f"{formula}: got {got}, want {expected}"
+    )
+
+
+@pytest.mark.parametrize(
+    "formula",
+    [
+        "0.1234567",  # 7 significant digits: no compact form — must error, not round
+        "1e300",  # exponent outside the evaluator's dynamic range
+        "-1000",  # NEG(x)=0-e^x overflows for x>709: not representable
+    ],
+)
+def test_unrepresentable_constants_fail_loudly(formula):
+    """Constants without a compact EML form raise a clean ValueError instead of
+    silently rounding to a nearby representable fraction."""
+    from emlcore.parser import parse_formula
+
+    with pytest.raises(ValueError):
+        compile_ast(parse_formula(formula))
+
+
+def test_parser_still_accepts_euler_e_after_number_literals():
+    """'e' remains the Euler constant even though numbers can now contain e/E
+    in an exponent (the exponent requires digits, so a lone e still lexes as
+    NAME)."""
+    from emlcore.parser import parse_formula
+
+    for formula, expected in [("e^2", math.e**2), ("e^-1", math.e**-1), ("e*pi", math.e * math.pi)]:
+        r = compile_ast(parse_formula(formula))
+        got = complex(r["value"]["re"], r["value"]["im"])
+        assert r["verified"] and abs(got - expected) < 1e-6, f"{formula}: got {got}"
+
+
 # --- prompt / parser drift guard --------------------------------------------
 
 

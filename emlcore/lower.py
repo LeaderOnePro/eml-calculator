@@ -13,6 +13,7 @@ Everything else is composed from exp/ln + the -inf terminal (ln 0).
 
 from __future__ import annotations
 
+import math
 from fractions import Fraction
 
 from . import mathast as A
@@ -157,7 +158,23 @@ _FUNCS = {
 }
 
 
+# _integer materializes a tree whose node count roughly doubles per binary
+# digit of n (the subtrees are not shared), so |n| beyond these limits explodes
+# in memory and time. The evaluator also overflows intermediates, asymmetrically:
+# a positive n is built from ADD(a,b)=exp(ln a)-ln(exp b) chains whose exp
+# operand is a binary term <= 512 (so n <= 1023 keeps e^term finite), while
+# NEG(x)=0-e^x consumes x directly and overflows once x > ~709 (the double
+# e^x overflow line). Numbers outside the range get a clean error — they have
+# no usable EML form anyway.
+_MAX_INTEGER = 1023
+_MIN_INTEGER = -709
+
+
 def _integer(n: int) -> Node:
+    if n > _MAX_INTEGER or n < _MIN_INTEGER:
+        raise ValueError(
+            f"integer {n} outside the expandable range [{_MIN_INTEGER}, {_MAX_INTEGER}]"
+        )
     if n == 0:
         return ZERO
     if n < 0:
@@ -176,11 +193,73 @@ def _integer(n: int) -> Node:
     return acc
 
 
+def _mantissa_exponent(value: float) -> tuple[int, int] | None:
+    """Decompose |value| as M*10^e with an integer M of at most 3 significant
+    digits (so M always fits the _integer cap). Returns None when the value
+    needs more digits, i.e. it has no compact EML form. This makes
+    scientific-notation inputs (1e6, 6.02e23, 1.23e5) lowerable: the input
+    itself carries the limited precision, so M*10^e reproduces it exactly at
+    float precision."""
+    a = abs(value)
+    k = math.floor(math.log10(a))
+    for digits in range(1, 4):
+        scale = 10.0 ** (k - digits + 1)
+        m = round(a / scale)
+        if 0 < m <= _MAX_INTEGER and abs(m * scale - a) <= a * 1e-12:
+            return m, k - digits + 1
+    return None
+
+
+# The DIV(a,b) = exp(ln a − ln b) construction loses numeric accuracy for
+# large denominators (verified: 1/1000 verifies, 1/4000 does not) — beyond
+# this bound use the mantissa·power-of-ten form instead.
+_MAX_DIV_DENOMINATOR = _MAX_INTEGER
+# POW(10, e) computes exp(e·ln 10); keep the intermediate exponent safely
+# below the ~709 overflow line.
+_MAX_MANTISSA_EXPONENT = 100
+
+
 def _rational(value: float) -> Node:
-    fr = Fraction(value).limit_denominator(10**6)
-    if fr.denominator == 1:
-        return _integer(fr.numerator)
-    return DIV(_integer(fr.numerator), _integer(fr.denominator))
+    # Every negative constant must pass through NEG(x) = 0 - e^x, which
+    # overflows once x exceeds ~709 — a hard representability boundary, unlike
+    # the magnitude limits below (positive constants of any scale can go
+    # through the mantissa·10^e form).
+    if value < _MIN_INTEGER:
+        raise ValueError(
+            f"negative constant {value!r} has no compact EML form: "
+            f"NEG(x) = 0 - e^x overflows once x exceeds {-_MIN_INTEGER}"
+        )
+    # Simple decimals keep their DIV form (0.5 -> 1/2, 0.001 -> 1/1000), which
+    # is shorter than a mantissa-times-power-of-ten tree. The fraction must
+    # reproduce the input at float precision — never silently round. The sign
+    # is applied last so NEG only ever sees the quotient (e^quotient overflows
+    # much later than e^numerator).
+    fr = Fraction(value).limit_denominator(_MAX_DIV_DENOMINATOR)
+    if (
+        abs(fr.numerator) <= _MAX_INTEGER
+        and fr.denominator <= _MAX_DIV_DENOMINATOR
+        and abs(float(fr)) <= -_MIN_INTEGER
+        and abs(float(fr) - value) <= abs(value) * 1e-15
+    ):
+        node = DIV(_integer(abs(fr.numerator)), _integer(fr.denominator))
+        return NEG(node) if value < 0 else node
+    # Fall back to M*10^e for scientific-notation-scale values.
+    me = _mantissa_exponent(value)
+    if me is None:
+        raise ValueError(
+            f"{value!r} has no compact EML expansion (needs more than 3 significant "
+            f"digits, an integer outside [{_MIN_INTEGER}, {_MAX_INTEGER}], or an "
+            f"exponent beyond ±{_MAX_MANTISSA_EXPONENT})"
+        )
+    m, e = me
+    if abs(e) > _MAX_MANTISSA_EXPONENT:
+        raise ValueError(f"exponent magnitude {abs(e)} exceeds {_MAX_MANTISSA_EXPONENT}")
+    node = _integer(m)
+    if e != 0:
+        ten = _integer(10)
+        power = POW(ten, _integer(e)) if e > 0 else POW(ten, NEG(_integer(-e)))
+        node = MUL(node, power)
+    return NEG(node) if value < 0 else node
 
 
 # --- lowering ---------------------------------------------------------------
@@ -190,7 +269,9 @@ def lower(ast: A.Ast) -> Node:
     L = lower
     if isinstance(ast, A.Num):
         v = float(ast.value)
-        return _integer(int(v)) if v.is_integer() else _rational(v)
+        if v.is_integer() and _MIN_INTEGER <= v <= _MAX_INTEGER:
+            return _integer(int(v))
+        return _rational(v)
     if isinstance(ast, A.ConstE):
         return E
     if isinstance(ast, A.ConstPi):
@@ -200,6 +281,14 @@ def lower(ast: A.Ast) -> Node:
     if isinstance(ast, A.VarX):
         return Var(ast.name)
     if isinstance(ast, A.Neg):
+        if isinstance(ast.x, A.Num):
+            folded = -float(ast.x.value)
+            # Integer result and NEG survives (operand e^{-folded} finite):
+            # keep the short NEG(_integer(n)) form. Otherwise let _rational
+            # apply the sign where it is representable, or fail cleanly.
+            if folded.is_integer() and folded >= _MIN_INTEGER:
+                return NEG(_integer(int(-folded)))
+            return _rational(folded)
         return NEG(L(ast.x))
     if isinstance(ast, A.Add):
         return ADD(L(ast.a), L(ast.b))

@@ -42,7 +42,10 @@ _GRAMMAR = r"""
          | NAME               -> name
          | "(" sum ")"
 
-    NUMBER: /\d+(\.\d+)?/
+    # Scientific notation and a leading-dot form: 1e-3, 1E-3, 2.5E+2, .5, 2.
+    # The exponent part requires digits after e/E, so a lone 'e' still lexes as
+    # the NAME terminal (Euler's constant) and e^2 / e^-1 keep working.
+    NUMBER: /(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?/
     NAME: /[a-zA-Z_][a-zA-Z_0-9]*/
     %import common.WS
     %ignore WS
