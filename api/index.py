@@ -69,6 +69,26 @@ def _llm_allowed() -> bool:
     return True
 
 
+# Fixed client-facing line for exceptions we cannot curate.
+_GENERIC_ERROR = "something went wrong while handling this formula"
+
+
+def _client_message(stage: str, err: Exception | None) -> str:
+    """Pick the client-facing text for an error response.
+
+    Only curated ValueError messages (parser / lower / LLM-reject copy written
+    for users) travel to the client verbatim. Any other exception — a missing
+    API key, a network failure, an actual bug — gets a fixed line, with the
+    full exception printed to the server logs (visible in Vercel runtime logs)
+    instead of the response body.
+    """
+    if isinstance(err, ValueError):
+        return str(err)
+    if err is not None:
+        print(f"[{stage}] {type(err).__name__}: {err!r}", flush=True)
+    return _GENERIC_ERROR
+
+
 @app.post("/api/compile")
 def compile_endpoint(req: CompileRequest) -> dict:
     """Compile a formula to a verified EML/RPN program.
@@ -113,8 +133,8 @@ def compile_endpoint(req: CompileRequest) -> dict:
                 "ok": False,
                 "stage": "parse",
                 "input": formula,
-                "error": str(parse_err),
-                "llm_error": str(llm_err),
+                "error": _client_message("parse", parse_err),
+                "llm_error": _client_message("llm", llm_err),
             }
 
     try:
@@ -125,7 +145,7 @@ def compile_endpoint(req: CompileRequest) -> dict:
             "stage": "lower",
             "input": formula,
             "interpreted": interpreted,
-            "error": str(lower_err),
+            "error": _client_message("lower", lower_err),
         }
 
     result["input"] = formula
