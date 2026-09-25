@@ -14,6 +14,7 @@ import {
   variables,
 } from "@/lib/eml";
 import { EmlTree } from "./EmlTree";
+import TreeModal from "./TreeModal";
 
 export type PlayRequest = { rpn: string; id: number };
 
@@ -57,6 +58,9 @@ export default function Calculator({ play }: { play?: PlayRequest }) {
   const [state, dispatch] = useReducer(reducer, { stack: [], past: [] });
   const { stack, past } = state;
   const [showTree, setShowTree] = useState(true);
+  // Snapshot of the tree to expand: fixed at click time, so a demo replay can
+  // keep animating behind the modal without re-fitting it every frame.
+  const [zoomNode, setZoomNode] = useState<EmlNode | null>(null);
   const playTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const top = stack[stack.length - 1] as EmlNode | undefined;
@@ -68,12 +72,13 @@ export default function Calculator({ play }: { play?: PlayRequest }) {
   const clear = useCallback(() => dispatch({ type: "clear" }), []);
 
   // Keyboard: 1 pushes, e/Enter applies eml, Backspace undoes, Esc clears.
-  // Ignored while a demo replay animates (each frame dispatches "show",
-  // which would silently overwrite any keystroke) and when a button has
-  // focus (Enter/Space would double-fire: button click + global handler).
+  // Suspended while the tree modal is open (its own handler owns Esc) and
+  // while a demo replay animates (each frame dispatches "show", which would
+  // silently overwrite any keystroke). Enter is also ignored when a button
+  // has focus: it would double-fire (button click + global eml binding).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (playTimer.current) return;
+      if (zoomNode || playTimer.current) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
       if (t?.tagName === "BUTTON" && e.key === "Enter") return;
@@ -93,7 +98,7 @@ export default function Calculator({ play }: { play?: PlayRequest }) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [push1, doEml, undo, clear]);
+  }, [push1, doEml, undo, clear, zoomNode]);
 
   // "One-click demo": replay an RPN program token-by-token onto the calculator.
   // EmlApp stamps every play request with a fresh id, so depending on `play`
@@ -234,12 +239,22 @@ export default function Calculator({ play }: { play?: PlayRequest }) {
             clear
           </button>
         </div>
-        <button
-          onClick={() => setShowTree((v) => !v)}
-          className="rounded-lg px-3 py-1.5 text-zinc-500 transition hover:text-zinc-300"
-        >
-          {showTree ? "hide tree" : "show tree"}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => top && setZoomNode(top)}
+            disabled={!top}
+            className="rounded-lg border border-zinc-700 px-3 py-1.5 text-zinc-300 transition enabled:hover:bg-zinc-800 disabled:opacity-40"
+            aria-label="expand tree"
+          >
+            ⛶ expand
+          </button>
+          <button
+            onClick={() => setShowTree((v) => !v)}
+            className="rounded-lg px-3 py-1.5 text-zinc-500 transition hover:text-zinc-300"
+          >
+            {showTree ? "hide tree" : "show tree"}
+          </button>
+        </div>
       </div>
 
       {/* tree */}
@@ -248,6 +263,8 @@ export default function Calculator({ play }: { play?: PlayRequest }) {
           <EmlTree node={top} />
         </div>
       )}
+
+      {zoomNode && <TreeModal node={zoomNode} onClose={() => setZoomNode(null)} />}
     </div>
   );
 }
