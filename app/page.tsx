@@ -33,7 +33,15 @@ export default function Home() {
       <EmlApp />
 
       <footer className="mt-10 font-mono text-xs text-zinc-600">
-        arXiv:2603.21852 · S → 1 | eml(S, S)
+        <a
+          href="https://arxiv.org/abs/2603.21852"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="transition hover:text-zinc-400"
+        >
+          arXiv:2603.21852
+        </a>{" "}
+        · S → 1 | eml(S, S)
       </footer>
     </main>
   );
