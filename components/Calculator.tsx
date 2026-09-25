@@ -68,10 +68,15 @@ export default function Calculator({ play }: { play?: PlayRequest }) {
   const clear = useCallback(() => dispatch({ type: "clear" }), []);
 
   // Keyboard: 1 pushes, e/Enter applies eml, Backspace undoes, Esc clears.
+  // Ignored while a demo replay animates (each frame dispatches "show",
+  // which would silently overwrite any keystroke) and when a button has
+  // focus (Enter/Space would double-fire: button click + global handler).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (playTimer.current) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
+      if (t?.tagName === "BUTTON" && e.key === "Enter") return;
       if (e.key === "1") {
         e.preventDefault();
         push1();

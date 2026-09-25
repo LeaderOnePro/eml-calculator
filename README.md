@@ -34,7 +34,7 @@ For example:
   needs: `ln 0 = −∞`, `e^{−∞} = 0`).
 - **AI: formula → EML** — a deterministic grammar parser handles well‑formed input
   (`sin(x)+2`, `sqrt(2)`, `e^(i*pi)`); only genuinely messy / natural‑language
-  input falls back to an LLM (**LongCat‑2.0**). Either way the result is lowered by
+  input falls back to an LLM (**Agnes 3.0 Flash**). Either way the result is lowered by
   the same deterministic compiler and **numerically verified** against a reference
   evaluator before it's shown — the compiler never returns an unverified program.
 

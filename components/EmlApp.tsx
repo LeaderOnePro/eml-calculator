@@ -80,6 +80,7 @@ export default function EmlApp() {
               onChange={(e) => setRpn(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && runManual()}
               placeholder="11xE1EE"
+              aria-label="RPN program"
               spellCheck={false}
               className="min-w-0 flex-1 rounded-lg border border-zinc-700 bg-black/50 px-3 py-2 font-mono text-sm text-zinc-100 outline-none focus:border-emerald-500/50"
             />
