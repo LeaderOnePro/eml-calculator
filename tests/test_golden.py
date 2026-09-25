@@ -460,3 +460,65 @@ def test_compile_rate_limited_after_burst():
     # Deterministic formulas bypass the LLM entirely and must still work.
     body = client.post("/api/compile", json={"formula": "sin(x)"}).json()
     assert body["ok"] is True and body["source"] == "parser"
+
+
+def test_compile_hides_non_valueerror_exception_details():
+    """Non-ValueError exceptions never reach the client: the response carries
+    the fixed generic line while the full exception goes to server logs.
+
+    Guards CWE-209 (py/stack-trace-exposure): the catch blocks are `except
+    Exception`, so e.g. a missing API key (RuntimeError) or a transport error
+    from the LLM client must not leak its message in the response body."""
+    import api.index as api_index
+    import emlcore.llm as llm_mod
+    from api.index import _GENERIC_ERROR, app
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+
+    def fake_nl(_text: str) -> str:
+        raise RuntimeError("AGNES_API_KEY is not set")
+
+    api_index._llm_hits.clear()  # don't inherit the rate-limit test's budget
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(llm_mod, "formula_from_nl", fake_nl)
+        body = client.post("/api/compile", json={"formula": "hello world"}).json()
+
+    assert body["ok"] is False and body["stage"] == "parse"
+    assert body["llm_error"] == _GENERIC_ERROR
+    assert "AGNES_API_KEY" not in body["llm_error"]
+    # The deterministic parse error is a curated ValueError and still flows
+    # (the parser deliberately wraps lark syntax errors for users).
+    assert body["error"].startswith("syntax error")
+
+
+def test_compile_lower_stage_hides_internal_errors():
+    """A non-ValueError escaping compile_ast is masked; the stage is kept."""
+    import api.index as api_index
+    from api.index import _GENERIC_ERROR, app
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+
+    def boom(_ast: object) -> dict:
+        raise TypeError("unexpected AST node <boom>")
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(api_index, "compile_ast", boom)
+        body = client.post("/api/compile", json={"formula": "x"}).json()
+
+    assert body["ok"] is False and body["stage"] == "lower"
+    assert body["error"] == _GENERIC_ERROR
+    assert "<boom>" not in body["error"]
+
+
+def test_compile_passes_curated_valueerror_through():
+    """Curated parser ValueErrors still surface verbatim to the client."""
+    from api.index import app
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    body = client.post("/api/compile", json={"formula": "foo(1)"}).json()
+
+    assert body["ok"] is False and body["stage"] == "parse"
+    assert "'foo'" in body["error"]
