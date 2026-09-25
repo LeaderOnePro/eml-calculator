@@ -146,7 +146,7 @@ export default function Calculator({ play }: { play?: PlayRequest }) {
   }, [top]);
 
   return (
-    <div className="w-full min-w-0 max-w-md rounded-2xl border border-zinc-800 bg-zinc-950 p-5 shadow-2xl">
+    <div className="flex w-full min-w-0 max-w-md flex-col rounded-2xl border border-zinc-800 bg-zinc-950 p-5 shadow-2xl">
       {/* value display */}
       <div className="rounded-xl bg-black/60 px-5 py-6 ring-1 ring-inset ring-zinc-800">
         <div className="flex items-baseline justify-between">
@@ -259,8 +259,15 @@ export default function Calculator({ play }: { play?: PlayRequest }) {
 
       {/* tree */}
       {showTree && top && (
-        <div className="mt-3 max-h-56 overflow-auto rounded-xl border border-zinc-800 bg-black/40 p-4">
-          <EmlTree node={top} />
+        <div className="relative mt-3 min-h-56 flex-1">
+          {/* Absolutely positioned so the tree's intrinsic height (a deep tree
+              is thousands of px) contributes NOTHING to the card's size — the
+              grid row is sized by the right column alone, the card stretches
+              to match it, and this box fills whatever that leaves. min-h-56
+              is a constant floor, so small trees look exactly as before. */}
+          <div className="absolute inset-0 overflow-auto rounded-xl border border-zinc-800 bg-black/40 p-4">
+            <EmlTree node={top} />
+          </div>
         </div>
       )}
 
