@@ -274,6 +274,8 @@ def test_numeric_literal_forms_compile_and_verify(formula, expected):
         "0.1234567",  # 7 significant digits: no compact form — must error, not round
         "1e300",  # exponent outside the evaluator's dynamic range
         "-1000",  # NEG(x)=0-e^x overflows for x>709: not representable
+        "e^1023",  # tree lowers, but the value ~4.5e443 exceeds the float64 ceiling
+        "e^2000",  # mantissa form (2*10^3) lowers, value still overflows
     ],
 )
 def test_unrepresentable_constants_fail_loudly(formula):
@@ -283,6 +285,17 @@ def test_unrepresentable_constants_fail_loudly(formula):
 
     with pytest.raises(ValueError):
         compile_ast(parse_formula(formula))
+
+
+def test_pow_overflow_error_is_curated():
+    """e^1023 lowers fine but its value exceeds the float64 ceiling: the
+    OverflowError from the reference evaluator must surface as the curated
+    ValueError, not a bare 'complex exponentiation'."""
+    from emlcore.parser import parse_formula
+
+    for formula in ["e^1023", "e^2000"]:
+        with pytest.raises(ValueError, match="exceeds double precision"):
+            compile_ast(parse_formula(formula))
 
 
 def test_parser_still_accepts_euler_e_after_number_literals():
@@ -522,3 +535,16 @@ def test_compile_passes_curated_valueerror_through():
 
     assert body["ok"] is False and body["stage"] == "parse"
     assert "'foo'" in body["error"]
+
+
+def test_compile_pow_overflow_returns_curated_envelope():
+    """End to end: e^1023 must produce the curated overflow message in the
+    API error envelope (it used to leak the bare OverflowError text)."""
+    from api.index import app
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    body = client.post("/api/compile", json={"formula": "e^1023"}).json()
+
+    assert body["ok"] is False and body["stage"] == "lower"
+    assert "exceeds double precision" in body["error"]
