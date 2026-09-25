@@ -71,6 +71,7 @@ export default function AiPanel({ onCompiled }: { onCompiled: (rpn: string) => v
           onChange={(e) => setFormula(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && compile()}
           placeholder="e^(i*pi)"
+          aria-label="formula"
           spellCheck={false}
           className="min-w-0 flex-1 rounded-lg border border-zinc-700 bg-black/50 px-3 py-2 font-mono text-sm text-zinc-100 outline-none focus:border-emerald-500/60"
         />
