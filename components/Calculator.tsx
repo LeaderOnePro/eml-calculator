@@ -145,8 +145,15 @@ export default function Calculator({ play }: { play?: PlayRequest }) {
     }
   }, [top]);
 
+  // Deep trees find the max-h cap useless (sin(x) has depth 45) — let the tree
+  // box grow to fill the card instead, so it lines up with the right column
+  // instead of leaving dead space below. Small trees keep the content-hugging
+  // box (the 224px cap fits ~6 levels, so 6 is where the switch happens).
+  const treeDepth = top ? depth(top) : 0;
+  const treeBoxTall = treeDepth > 6;
+
   return (
-    <div className="w-full min-w-0 max-w-md rounded-2xl border border-zinc-800 bg-zinc-950 p-5 shadow-2xl">
+    <div className="flex w-full min-w-0 max-w-md flex-col rounded-2xl border border-zinc-800 bg-zinc-950 p-5 shadow-2xl">
       {/* value display */}
       <div className="rounded-xl bg-black/60 px-5 py-6 ring-1 ring-inset ring-zinc-800">
         <div className="flex items-baseline justify-between">
@@ -259,7 +266,11 @@ export default function Calculator({ play }: { play?: PlayRequest }) {
 
       {/* tree */}
       {showTree && top && (
-        <div className="mt-3 max-h-56 overflow-auto rounded-xl border border-zinc-800 bg-black/40 p-4">
+        <div
+          className={`mt-3 overflow-auto rounded-xl border border-zinc-800 bg-black/40 p-4 ${
+            treeBoxTall ? "min-h-0 flex-1" : "max-h-56"
+          }`}
+        >
           <EmlTree node={top} />
         </div>
       )}
