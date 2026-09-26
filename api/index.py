@@ -18,7 +18,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-app = FastAPI(title="EML Calculator API", version="0.1.0")
+app = FastAPI(title="EML Calculator API", version="1.0.0")
 
 # A formula that actually needs the LLM fallback is a sentence; anything past a
 # few hundred chars is payload abuse (the deterministic parser fails on it long
