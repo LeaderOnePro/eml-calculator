@@ -86,12 +86,13 @@ only:
 export ORCAROUTER_API_KEY=...    # or copy .env.example → .env.local
 ```
 
-## Deploy
+## DeployOne Vercel project serves both the Next.js frontend and the Python API. The FastAPI app in `api/index.py` becomes a single serverless function; `vercel.json` rewrites `/api/*` to it. Python dependencies on Vercel come from the committed `requirements.txt` — exported from `uv.lock` with dev-only packages (uvicorn, pytest, ruff) excluded, which keeps the serverless bundle small. After changing dependencies, regenerate it:
 
-One Vercel project serves both the Next.js frontend and the Python API. The
-FastAPI app in `api/index.py` becomes a single serverless function; `vercel.json`
-rewrites `/api/*` to it, and Python dependencies come from `pyproject.toml` +
-`uv.lock`. Set `ORCAROUTER_API_KEY` in the project's environment variables.
+```bash
+uv export --format requirements-txt --no-dev --no-hashes --no-emit-project -o requirements.txt
+```
+
+Set `ORCAROUTER_API_KEY` in the project's environment variables.
 
 > Deployed and verified end-to-end at
 > [eml-calculator.vercel.app](https://eml-calculator.vercel.app): the frontend, the
