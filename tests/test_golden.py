@@ -428,13 +428,14 @@ def test_llm_prompt_covers_supported_functions():
     assert not missing, f"LLM prompt missing function(s): {sorted(missing)}"
 
 
-def test_llm_provider_is_agnes():
-    """The fallback targets Agnes 3.0 Flash's OpenAI-compatible endpoint and
-    reads the key from AGNES_API_KEY."""
+def test_llm_provider_is_orcarouter():
+    """The fallback targets OrcaRouter's OpenAI-compatible gateway using the
+    orcarouter/free pool routing name, and reads the key from
+    ORCAROUTER_API_KEY."""
     from emlcore import llm
 
-    assert llm._MODEL == "agnes-3.0-flash"
-    assert llm._BASE_URL == "https://apihub.agnes-ai.com/v1"
+    assert llm._MODEL == "orcarouter/free"
+    assert llm._BASE_URL == "https://api.orcarouter.ai/v1"
 
 
 # --- /api/compile abuse guards -----------------------------------------------
@@ -490,7 +491,7 @@ def test_compile_hides_non_valueerror_exception_details():
     client = TestClient(app)
 
     def fake_nl(_text: str) -> str:
-        raise RuntimeError("AGNES_API_KEY is not set")
+        raise RuntimeError("ORCAROUTER_API_KEY is not set")
 
     api_index._llm_hits.clear()  # don't inherit the rate-limit test's budget
     with pytest.MonkeyPatch.context() as mp:
@@ -499,7 +500,7 @@ def test_compile_hides_non_valueerror_exception_details():
 
     assert body["ok"] is False and body["stage"] == "parse"
     assert body["llm_error"] == _GENERIC_ERROR
-    assert "AGNES_API_KEY" not in body["llm_error"]
+    assert "ORCAROUTER_API_KEY" not in body["llm_error"]
     # The deterministic parse error is a curated ValueError and still flows
     # (the parser deliberately wraps lark syntax errors for users).
     assert body["error"].startswith("syntax error")

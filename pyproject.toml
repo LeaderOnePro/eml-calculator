@@ -1,6 +1,6 @@
 [project]
 name = "eml-calculator-api"
-version = "0.1.0"
+version = "1.0.0"
 description = "EML calculator backend — deterministic formula→EML compiler, complex evaluator, numeric verifier, LLM fallback"
 readme = "README.md"
 license = "MIT"
