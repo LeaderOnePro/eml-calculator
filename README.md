@@ -104,7 +104,7 @@ Set `ORCAROUTER_API_KEY` in the project's environment variables.
 ## Credits
 
 - **A. Odrzywołek**, _All elementary functions from a single operator_,
-  arXiv:2603.21852 (2026) — the single-operator result this is built on.
+  [arXiv:2603.21852 (2026)](https://arxiv.org/abs/2603.21852) — the single-operator result this is built on.
 - The integer (binary double-and-add) construction and the inverse-function
   log-forms are adopted from the author's reference implementation,
   [VA00/SymbolicRegressionPackage](https://github.com/VA00/SymbolicRegressionPackage)
